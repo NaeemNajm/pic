@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ইন্টারেক্টিভ উমরাহ চেকলিস্ট - আল-হিকমাহ ট্যুর অ্যান্ড ট্রাভেলস</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Mecca Twilight -->
+    <!-- Application Structure Plan: The application uses a tab-based navigation structure. This design was chosen to break down the long checklist from the source report into logical, manageable categories (e.g., Essentials, Men's, Women's). This prevents user overload and allows for focused preparation. Users can click on a tab to view the specific list, and interact with items by checking them off. A new summary section dynamically displays checked items. Download buttons for both the full list and the checked list (as PDF/JPG) have been added to provide users with offline-accessible versions of their lists. This structure directly serves the user's primary goal: to systematically pack for their journey and have a record of it. -->
+    <!-- Visualization & Content Choices: Report Info: The source is a categorized checklist for Umrah. Goal: To create a practical, interactive packing tool with download functionality. Viz/Presentation Method: The information is presented in interactive lists within a tabbed interface. A new dynamic list shows checked items. Interaction: Users can click tabs, check/uncheck items. Checking an item adds it to a summary list. Download buttons trigger client-side generation of PDF/JPG files. Justification: This transforms a static document into a functional application. The download feature is a significant enhancement, allowing users to save or print their lists. Library/Method: Vanilla JS for logic, Tailwind CSS for styling, jsPDF and html2canvas for download functionality. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Hind Siliguri', sans-serif;
+            background-color: #F0F2F5;
+        }
+        .tab-active {
+            background-color: #2D3748; /* Gray 800 */
+            color: white;
+            border-color: #1A202C;
+            box-shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+        .tab-inactive {
+            background-color: #E2E8F0;
+            color: #2D3748;
+            border-color: #CBD5E0;
+        }
+        .content-panel { display: none; }
+        .content-panel.active { display: block; }
+        .checklist-item input:checked + label {
+            text-decoration: line-through;
+            color: #A0AEC0;
+        }
+        .checklist-item label {
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+        }
+        .essential-item {
+            color: #C53030; /* Red-700 */
+            font-weight: 600;
+        }
+        .bag-tag {
+            font-size: 0.75rem;
+            font-weight: 500;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            margin-left: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.2;
+        }
+        .bag-hand {
+            background-color: #EBF4FF;
+            color: #3182CE;
+            border: 1px solid #90CDF4;
+        }
+        .bag-luggage {
+            background-color: #FEEBC8;
+            color: #DD6B20;
+            border: 1px solid #FBD38D;
+        }
+        .action-button {
+            background-image: linear-gradient(to right, #D69E2E 0%, #B7791F 51%, #D69E2E 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: 0.5s;
+            background-size: 200% auto;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            font-size: 14px;
+        }
+        .action-button:hover {
+            background-position: right center;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .action-button:disabled {
+            background-image: none;
+            background-color: #A0AEC0;
+            cursor: not-allowed;
+            transform: translateY(0);
+            box-shadow: none;
+        }
+        .printable-area {
+            font-family: 'Hind Siliguri', sans-serif;
+            position: absolute;
+            left: -9999px;
+            top: auto;
+            width: 840px; /* A4-like width */
+            background-color: #ffffff;
+            padding: 40px;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+        .watermark-container {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: var(--watermark-url);
+            background-repeat: repeat;
+            z-index: 0;
+        }
+        .printable-header, .printable-footer, .printable-content {
+            position: relative;
+            z-index: 1;
+        }
+        .printable-header, .printable-footer {
+            text-align: center;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #2D3748;
+        }
+        .printable-footer {
+            padding-top: 20px;
+            margin-top: 20px;
+            border-top: 2px solid #2D3748;
+            border-bottom: none;
+        }
+        .printable-header h1, .printable-footer h1 {
+             font-size: 28px;
+             font-weight: 700;
+             color: #1A202C;
+        }
+        .printable-header p, .printable-footer p {
+            font-size: 14px;
+            color: #4A5568;
+        }
+        .printable-content {
+            column-count: 2;
+            column-gap: 40px;
+        }
+        .list-break {
+            break-before: column;
+        }
+        .checked-category-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #1A202C;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+            padding: 0.5rem;
+            background-color: #EDF2F7;
+            border-left: 4px solid #2D3748;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="antialiased text-gray-800">
+    <div class="container mx-auto p-4 md:p-8 max-w-6xl">
+        
+        <header class="text-center mb-10 bg-white p-8 rounded-3xl shadow-2xl">
+            <h1 class="text-6xl md:text-7xl font-bold text-gray-800">🕋</h1>
+            <h2 class="text-3xl md:text-4xl font-bold text-gray-800 mt-2">পবিত্র উমরাহ যাত্রার চেকলিস্ট</h2>
+            <div class="mt-4 max-w-2xl mx-auto bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-md" role="alert">
+                <p class="font-bold">পবিত্র ভূমির প্রতিটি পদক্ষেপে আমরা থাকবো আপনার বিশ্বস্ত সঙ্গী।</p>
+                <p>আসুন, আমাদের সাথে শুরু করুন আপনার আধ্যাত্মিক যাত্রার সেরা অভিজ্ঞতা। আপনার সেবা করার সুযোগ পেয়ে আমরা গর্বিত।</p>
+            </div>
+            
+            <div class="mt-6 max-w-2xl mx-auto bg-red-100 border-l-4 border-red-500 text-red-800 p-4 rounded-md" role="alert">
+                <p class="font-bold">বিশেষ দ্রষ্টব্য: সফরে যত কম सामान, তত বেশি আরাম।</p>
+                <p>এই তালিকাটি আপনাকে একটি পূর্ণাঙ্গ ধারণা দেওয়ার জন্য। আপনার প্রয়োজন অনুযায়ী জিনিসপত্র নিন এবং অতিরিক্ত মালামাল বহন করা থেকে বিরত থাকুন।</p>
+            </div>
+
+            <div class="mt-6">
+                <input type="text" id="customer-name" placeholder="আপনার নাম লিখুন..." class="px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-gray-800 focus:border-gray-800 w-full max-w-sm mx-auto text-center">
+            </div>
+
+            <div class="mt-6 p-4 border-t border-gray-200 max-w-2xl mx-auto">
+                <h3 class="font-bold text-lg text-gray-700 mb-3 text-center">সম্পূর্ণ তালিকা</h3>
+                <div id="full-list-actions" class="flex justify-center flex-wrap gap-3">
+                     <button data-type="full" data-format="pdf" class="action-button download-btn">ডাউনলোড (PDF)</button>
+                     <button data-type="full" data-format="jpg" class="action-button download-btn">ডাউনলোড (JPG)</button>
+                     <button data-type="full" class="action-button print-btn">প্রিন্ট করুন</button>
+                     <button data-type="full" class="action-button share-btn">শেয়ার করুন</button>
+                </div>
+            </div>
+        </header>
+
+        <main id="main-checklist" class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-4 sm:p-6">
+            <div id="tab-nav" class="flex flex-wrap justify-center gap-2 mb-6">
+                <button data-tab="from_agency" class="tab-button text-sm sm:text-base font-semibold py-2 px-3 rounded-lg border-2 transition-all duration-300">🎁 আমাদের পক্ষ থেকে</button>
+                <button data-tab="essentials" class="tab-button text-sm sm:text-base font-semibold py-2 px-3 rounded-lg border-2 transition-all duration-300">অত্যাবশ্যকীয়</button>
+                <button data-tab="general" class="tab-button text-sm sm:text-base font-semibold py-2 px-3 rounded-lg border-2 transition-all duration-300">সবার জন্য</button>
+                <button data-tab="men" class="tab-button text-sm sm:text-base font-semibold py-2 px-3 rounded-lg border-2 transition-all duration-300">পুরুষদের জন্য</button>
+                <button data-tab="women" class="tab-button text-sm sm:text-base font-semibold py-2 px-3 rounded-lg border-2 transition-all duration-300">মহিলাদের জন্য</button>
+                <button data-tab="newborn" class="tab-button text-sm sm:text-base font-semibold py-2 px-3 rounded-lg border-2 transition-all duration-300">নবজাতক</button>
+                <button data-tab="child" class="tab-button text-sm sm:text-base font-semibold py-2 px-3 rounded-lg border-2 transition-all duration-300">শিশু (২-১৭)</button>
+                <button data-tab="elderly" class="tab-button text-sm sm:text-base font-semibold py-2 px-3 rounded-lg border-2 transition-all duration-300">বয়োজ্যেষ্ঠ</button>
+                <button data-tab="medicine" class="tab-button text-sm sm:text-base font-semibold py-2 px-3 rounded-lg border-2 transition-all duration-300">ঔষধ</button>
+                <button data-tab="optional" class="tab-button text-sm sm:text-base font-semibold py-2 px-3 rounded-lg border-2 transition-all duration-300">ঐচ্ছিক</button>
+            </div>
+
+            <div id="tab-content">
+                 <div id="from_agency" class="content-panel"></div>
+                 <div id="essentials" class="content-panel"></div>
+                 <div id="general" class="content-panel"></div>
+                 <div id="men" class="content-panel"></div>
+                 <div id="women" class="content-panel"></div>
+                 <div id="newborn" class="content-panel"></div>
+                 <div id="child" class="content-panel"></div>
+                 <div id="elderly" class="content-panel"></div>
+                 <div id="medicine" class="content-panel"></div>
+                 <div id="optional" class="content-panel"></div>
+            </div>
+        </main>
+        
+        <section id="checked-items-summary" class="mt-8 bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-4 sm:p-6 hidden">
+            <h3 class="text-2xl font-bold text-gray-800 mb-4 border-b-2 border-gray-800 pb-2">✅ আপনার গোছানো আইটেমসমূহ</h3>
+            <div id="checked-list-container"></div>
+            <div class="mt-6 p-4 border-t border-gray-200">
+                <h3 class="font-bold text-lg text-gray-700 mb-3 text-center">নির্বাচিত তালিকা</h3>
+                <div id="checked-list-actions" class="flex justify-center flex-wrap gap-3">
+                    <button data-type="checked" data-format="pdf" class="action-button download-btn">ডাউনলোড (PDF)</button>
+                    <button data-type="checked" data-format="jpg" class="action-button download-btn">ডাউনলোড (JPG)</button>
+                    <button data-type="checked" class="action-button print-btn">প্রিন্ট করুন</button>
+                    <button data-type="checked" class="action-button share-btn">শেয়ার করুন</button>
+                </div>
+            </div>
+        </section>
+
+        <footer class="text-center mt-8 bg-gray-800 text-white rounded-2xl p-6">
+            <h4 class="font-bold text-xl">আপনার উমরাহ যাত্রা হোক নিরাপদ ও কবুলযোগ্য</h4>
+            <div class="mt-4 text-gray-300">
+                <p class="font-semibold text-lg">আল-হিকমাহ ট্যুর অ্যান্ড ট্রাভেলস</p>
+                <p>যোগাযোগ: +8801914137050 (WhatsApp) | ইমেইল: alhikmahtourbd@gmail.com</p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const { jsPDF } = window.jspdf;
+            
+            const checklistData = {
+                from_agency: { title: '🎁 আল-হিকমাহ এর পক্ষ থেকে', items: [
+                    { name: '*ভিসার হার্ডকপি', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '*টিকিটের হার্ডকপি', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '*একটি আইডি কার্ড', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '*পিঠে ঝুলানোর দুই চেম্বারের ব্যাগ', bag: 'সাথে থাকবে' },
+                    { name: '*লাগেজ ট্যাগ স্টিকার', bag: 'লাগেজ' },
+                    { name: '*ওমরা পালনের নিয়মাবলি বই', bag: 'হ্যান্ডব্যাগ' }
+                ]},
+                essentials: { title: '📄 অত্যাবশ্যকীয় নথি ও অর্থ', items: [
+                    { name: '*🛂 পাসপোর্ট ও ভিসা (ফটোকপিসহ)', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '*✈️ বিমানের টিকিট (প্রিন্ট ও ডিজিটাল কপি)', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '*💳 ন্যাশনাল আইডি কার্ড (ফটোকপিসহ) (অফিস প্রদত্ত)', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '*পুরাতন পাসপোর্ট (যদি থাকে)', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '🖼️ পাসপোর্ট সাইজের ছবি (১০-১২ কপি)', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '*💵 সৌদি রিয়াল ও আন্তর্জাতিক কার্ড', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '*🏷️ লাগেজ ট্যাগ (নাম, ঠিকানা সহ) (অফিস প্রদত্ত)', bag: 'লাগেজ' },
+                    { name: '☎️ এজেন্সি ও হোটেলের যোগাযোগ তথ্য', bag: 'হ্যান্ডব্যাগ' }
+                ]},
+                general: { title: '🎒 সবার জন্য সাধারণ ব্যবহার্য', items: [
+                    { name: '*👜 ছোট কাঁধের ব্যাগ (অফিস প্রদত্ত)', bag: 'সাথে থাকবে' },
+                    { name: '*📱 মোবাইল, চার্জার ও পাওয়ার ব্যাংক', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '*ট্রলি/লাগেজ ব্যাগ', bag: 'লাগেজ' },
+                    { name: '🔌 ইউনিভার্সাল ট্র্যাভেল অ্যাডাপ্টার', bag: 'লাগেজ' },
+                    { name: '🧼 গোসলের সাবান (সুগন্ধিবিহীন)', bag: 'লাগেজ' },
+                    { name: '🧴 শ্যাম্পু, টুথপেস্ট, ব্রাশ', bag: 'লাগেজ' },
+                    { name: '🧴 ভ্যাসলিন/লিপজেল', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '💧 ছোট পানির বোতল (খালি)', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '🍪 হালকা শুকনো খাবার', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '🕌 ছোট জায়নামাজ', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '☂️ ছোট ছাতা ও 🕶️ সানগ্লাস', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '🚽 টয়লেট পেপার', bag: 'লাগেজ' }
+                ]},
+                men: { title: '🧔🏻 শুধু পুরুষদের জন্য', items: [
+                    { name: '*🏳️ ইহরামের কাপড় (কমপক্ষে ২ সেট)', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '💰 ইহরামের বেল্ট (পকেটসহ)', bag: 'সাথে থাকবে' },
+                    { name: '*🩴 ফিতাযুক্ত খোলা স্যান্ডেল', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '👕 সাধারণ পোশাক (২-৩ সেট)', bag: 'লাগেজ' },
+                    { name: '✂️ ছোট কাঁচি বা নেইল কাটার', bag: 'লাগেজ' },
+                    { name: '🔪 ব্লেড/রেজার (ইহরাম শেষে)', bag: 'লাগেজ' }
+                ]},
+                women: { title: '🧕🏻 শুধু মহিলাদের জন্য', items: [
+                    { name: '*🧕 আবায়া ও হিজাব (২-৩ সেট)', bag: 'লাগেজ' },
+                    { name: '🧤 হাত মোজা ও পা মোজা', bag: 'লাগেজ' },
+                    { name: '*👟 আরামদায়ক জুতা/স্যান্ডেল', bag: 'লাগেজ' },
+                    { name: '🩸 স্যানিটারি ন্যাপকিন/প্যাড', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '🧷 সেফটিপিন ও হিজাব পিন', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '👗 হোটেলে পরার জন্য সাধারণ পোশাক', bag: 'লাগেজ' }
+                ]},
+                newborn: { title: '👶 নবজাতকের জন্য', items: [
+                    { name: '*পর্যাপ্ত ডায়াপার ও ওয়েট টিস্যু', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '*ফিডিং বোতল ও ফর্মুলা দুধ', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '*শিশুকে বহনের জন্য বেবি ক্যারিয়ার', bag: 'সাথে থাকবে' },
+                    { name: 'নরম ও পাতলা কাঁথা', bag: 'হ্যান্ডব্যাগ' },
+                    { name: 'শিশুর জন্য নিরাপদ সাবান/শ্যাম্পু', bag: 'লাগেজ' },
+                    { name: 'অতিরিক্ত নরম কাপড় (কয়েক সেট)', bag: 'লাগেজ' },
+                    { name: 'ছোট খেলনা বা চুষনি', bag: 'হ্যান্ডব্যাগ' }
+                ]},
+                child: { title: '👧 শিশু (২-১৭) এর জন্য', items: [
+                    { name: '*আরামদায়ক জুতা বা স্যান্ডেল', bag: 'লাগেজ' },
+                    { name: 'ইসলামিক গল্পের বই', bag: 'হ্যান্ডব্যাগ' },
+                    { name: 'পছন্দের শুকনো খাবার বা স্ন্যাকস', bag: 'হ্যান্ডব্যাগ' },
+                    { name: 'নিজের জিনিস রাখার জন্য ছোট ব্যাগ', bag: 'সাথে থাকবে' },
+                    { name: 'সাধারণ ঔষধপত্র (প্যারাসিটামল)', bag: 'হ্যান্ডব্যাগ' },
+                    { name: 'রোদ থেকে বাঁচার জন্য টুপি', bag: 'হ্যান্ডব্যাগ' }
+                ]},
+                elderly: { title: '👴 বয়োজ্যেষ্ঠদের জন্য', items: [
+                    { name: '*সব নিয়মিত ঔষধ (ডাক্তারের ব্যবস্থাপত্র সহ)', bag: 'হ্যান্ডব্যাগ' },
+                    { name: 'হাঁটার জন্য লাঠি বা হুইলচেয়ার', bag: 'লাগেজ' },
+                    { name: 'হাঁটু বা গোড়ালির সাপোর্ট/অ্যাঙ্কলেট', bag: 'লাগেজ' },
+                    { name: 'সহজে হজম হয় এমন খাবার', bag: 'হ্যান্ডব্যাগ' },
+                    { name: 'পরিবারের জরুরি যোগাযোগের নম্বর', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '*নরম ও আরামদায়ক জুতা (নন-স্লিপ)', bag: 'লাগেজ' }
+                ]},
+                medicine: { title: '🏥 ঔষধ ও প্রাথমিক চিকিৎসা', items: [
+                    { name: '💊 সাধারণ ঔষধ (প্যারাসিটামল, গ্যাস্ট্রিক, স্যালাইন)', bag: 'লাগেজ' },
+                    { name: '🩹 ব্যান্ডেজ ও অ্যান্টিসেপটিক', bag: 'লাগেজ' },
+                    { name: '*🩺 ব্যক্তিগত প্রয়োজনীয় ঔষধ (প্রেসক্রিপশন সহ)', bag: 'হ্যান্ডব্যাগ' }
+                ]},
+                optional: { title: '✨ ঐচ্ছিক কিন্তু উপকারী', items: [
+                    { name: '📖 ছোট কুরআন শরীফ ও দোয়ার বই (অফিস প্রদত্ত)', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '📿 তসবিহ', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '✒️ ডায়েরি ও কলম', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '💦 স্প্রে বোতল (অজুর জন্য)', bag: 'লাগেজ' },
+                    { name: '🧵 সুই-সুতা', bag: 'লাগেজ' },
+                    { name: '🛍️ ভাঁজ করা যায় এমন ব্যাগ', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '💵 কিছু বাংলাদেশী টাকা', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '🧴 সানস্ক্রিন (ত্বকের ধরন অনুযায়ী)', bag: 'লাগেজ' },
+                    { name: '😴 নেক পিলো', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '💨 পোর্টেবল ফ্যান', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '🔒 ছোট তালা (লাগেজের জন্য)', bag: 'লাগেজ' },
+                    { name: '💧 পানিরোধী ব্যাগ (মোবাইল/টাকার জন্য)', bag: 'হ্যান্ডব্যাগ' },
+                    { name: '🔪 ফল কাটার ছুরি', bag: 'লাগেজ' },
+                    { name: '🍽️ প্লেট, গ্লাস, চামচ, মগ', bag: 'লাগেজ' },
+                    { name: '🧼 কাপড় কাচার সাবান', bag: 'লাগেজ' },
+                    { name: '🎗️ কাপড় শুকানোর রশি', bag: 'লাগেজ' },
+                    { name: '🩹 সার্জিক্যাল টেপ', bag: 'লাগেজ' }
+                ]}
+            };
+
+            function renderChecklists() {
+                for (const category in checklistData) {
+                    const panel = document.getElementById(category);
+                    const data = checklistData[category];
+                    let html = `
+                        <h3 class="text-xl font-bold text-gray-700 mb-4 border-b-2 border-indigo-200 pb-2">${data.title}</h3>
+                        <div class="checklist-item flex items-center mb-4 border-b pb-2">
+                            <input id="select-all-${category}" type="checkbox" class="h-5 w-5 rounded border-gray-400 text-indigo-600 focus:ring-indigo-500 mr-3 select-all-checkbox" data-category="${category}">
+                            <label for="select-all-${category}" class="text-gray-800 font-semibold">সবগুলো নির্বাচন করুন</label>
+                        </div>
+                        <ul class="space-y-3">`;
+                    data.items.forEach((item, index) => {
+                        const itemId = `${category}-${index}`;
+                        const isEssential = item.name.startsWith('*');
+                        const cleanItem = isEssential ? item.name.substring(1) : item.name;
+                        const labelClass = isEssential ? 'essential-item' : '';
+                        const starIcon = isEssential ? '<span class="text-red-500 mr-1">★</span>' : '';
+                        const bagTagClass = item.bag === 'হ্যান্ডব্যাগ' || item.bag === 'সাথে থাকবে' ? 'bag-hand' : 'bag-luggage';
+
+                        html += `
+                            <li class="checklist-item flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <input id="${itemId}" type="checkbox" class="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 mr-3 item-checkbox" data-category="${category}" data-title="${data.title}" data-essential="${isEssential}" data-bag="${item.bag}">
+                                    <label for="${itemId}" class="text-gray-700 flex items-center ${labelClass}">${starIcon} ${cleanItem}</label>
+                                </div>
+                                <span class="bag-tag ${bagTagClass}">${item.bag}</span>
+                            </li>`;
+                    });
+                    html += '</ul>';
+                    panel.innerHTML = html;
+                }
+            }
+
+            function updateCheckedState() {
+                const checkedItemsByCat = {};
+                document.querySelectorAll('.item-checkbox:checked').forEach(cb => {
+                    const categoryTitle = cb.dataset.title;
+                    if (!checkedItemsByCat[categoryTitle]) checkedItemsByCat[categoryTitle] = [];
+                    const labelContent = cb.nextElementSibling.innerHTML;
+                    const bagTag = cb.closest('li').querySelector('.bag-tag').outerHTML;
+                    checkedItemsByCat[categoryTitle].push({label: labelContent, bag: bagTag});
+                });
+
+                const container = document.getElementById('checked-list-container');
+                const summarySection = document.getElementById('checked-items-summary');
+                container.innerHTML = '';
+                
+                if (Object.keys(checkedItemsByCat).length > 0) {
+                    for (const categoryTitle in checkedItemsByCat) {
+                        let categoryHtml = `<h4 class="checked-category-title">${categoryTitle}</h4><ul class="space-y-2 list-disc list-inside text-gray-700 pl-4">`;
+                        checkedItemsByCat[categoryTitle].forEach(item => {
+                            categoryHtml += `<li class="flex justify-between items-center">${item.label}${item.bag}</li>`;
+                        });
+                        categoryHtml += `</ul>`;
+                        container.innerHTML += categoryHtml;
+                    }
+                    summarySection.classList.remove('hidden');
+                } else {
+                    summarySection.classList.add('hidden');
+                }
+            }
+
+            function handleSelectAll(e) {
+                const category = e.target.dataset.category;
+                document.querySelectorAll(`.item-checkbox[data-category="${category}"]`).forEach(cb => {
+                    cb.checked = e.target.checked;
+                });
+                updateCheckedState();
+            }
+            
+            function handleItemCheck(e) {
+                const category = e.target.dataset.category;
+                const itemCheckboxes = document.querySelectorAll(`.item-checkbox[data-category="${category}"]`);
+                document.getElementById(`select-all-${category}`).checked = Array.from(itemCheckboxes).every(cb => cb.checked);
+                updateCheckedState();
+            }
+
+            function switchTab(tab) {
+                document.querySelectorAll('.tab-button').forEach(t => t.classList.replace('tab-active', 'tab-inactive'));
+                tab.classList.replace('tab-inactive', 'tab-active');
+                document.querySelectorAll('.content-panel').forEach(panel => panel.classList.remove('active'));
+                document.getElementById(tab.dataset.tab).classList.add('active');
+            }
+
+            async function performAction(button, action) {
+                const type = button.dataset.type;
+                const format = button.dataset.format;
+                const contentGenerator = type === 'full' ? generateFullListHTML : generateCheckedListHTML;
+                const baseFilename = type === 'full' ? 'Umrah_Full_Checklist' : 'My_Umrah_Packed_Items';
+
+                button.disabled = true;
+                const originalText = button.textContent;
+                button.textContent = 'প্রসেসিং...';
+
+                const printableArea = document.createElement('div');
+                printableArea.className = 'printable-area';
+                
+                const contentHTML = contentGenerator();
+                if (!contentHTML) {
+                    alert('প্রথমে তালিকা থেকে কিছু আইটেম নির্বাচন করুন।');
+                    button.disabled = false;
+                    button.textContent = originalText;
+                    return;
+                }
+                
+                await createPrintableContent(printableArea, contentHTML);
+                document.body.appendChild(printableArea);
+                
+                const watermarkDataUrl = await createWatermarkWithLogo();
+                printableArea.innerHTML += `<div class="watermark-container" style="background-image: ${watermarkDataUrl}"></div>`;
+
+                try {
+                    const canvas = await html2canvas(printableArea, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+                    
+                    if (action === 'download') {
+                        const customerName = document.getElementById('customer-name').value.trim().replace(/\s+/g, '_') || 'Guest';
+                        const filename = `${baseFilename}_${customerName}`;
+                        if (format === 'jpg') {
+                            const link = document.createElement('a');
+                            link.href = canvas.toDataURL('image/jpeg', 0.95);
+                            link.download = `${filename}.jpg`;
+                            link.click();
+                        } else if (format === 'pdf') {
+                            const imgData = canvas.toDataURL('image/png');
+                            const pdf = new jsPDF({ orientation: 'p', unit: 'px', format: [canvas.width, canvas.height] });
+                            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height, undefined, 'FAST');
+                            pdf.save(`${filename}.pdf`);
+                        }
+                    } else if (action === 'print') {
+                        const iframe = document.createElement('iframe');
+                        iframe.style.position = 'absolute';
+                        iframe.style.width = '0';
+                        iframe.style.height = '0';
+                        iframe.style.border = '0';
+                        document.body.appendChild(iframe);
+                        
+                        const doc = iframe.contentWindow.document;
+                        doc.open();
+                        doc.write(`<html><head><title>Print</title></head><body><img src="${canvas.toDataURL()}" style="width:100%;"></body></html>`);
+                        doc.close();
+                        
+                        iframe.contentWindow.focus();
+                        iframe.contentWindow.print();
+                        setTimeout(() => { document.body.removeChild(iframe); }, 1000);
+
+                    } else if (action === 'share') {
+                        if (navigator.share) {
+                            canvas.toBlob(async function(blob) {
+                                const file = new File([blob], `${baseFilename}.jpg`, { type: 'image/jpeg' });
+                                try {
+                                    await navigator.share({
+                                        title: 'আমার উমরাহ চেকলিস্ট',
+                                        text: 'আল-হিকমাহ ট্যুর অ্যান্ড ট্রাভেলস এর সাথে আমার উমরাহ যাত্রার প্রস্তুতি।',
+                                        files: [file]
+                                    });
+                                } catch (err) {
+                                    console.error('Share failed:', err.message);
+                                    if (err.name !== 'AbortError') {
+                                        alert('দুঃখিত, শেয়ার করা সম্ভব হয়নি। আপনার ব্রাউজার বা বর্তমান ভিউতে এই ফিচারটি সাপোর্ট নাও করতে পারে।');
+                                    }
+                                }
+                            }, 'image/jpeg');
+                        } else {
+                            alert('আপনার ব্রাউজার এই শেয়ার ফিচারটি সাপোর্ট করে না।');
+                        }
+                    }
+                } catch (error) {
+                    console.error('Action failed:', error);
+                    alert('দুঃখিত, এই কাজটি সম্পন্ন করা সম্ভব হয়নি।');
+                } finally {
+                    document.body.removeChild(printableArea);
+                    button.disabled = false;
+                    button.textContent = originalText;
+                }
+            }
+            
+            async function createPrintableContent(container, contentHTML) {
+                const guestName = document.getElementById('customer-name').value.trim() || 'আল্লাহর ঘরের মেহমান';
+                
+                const now = new Date();
+                const days = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
+                const dayName = days[now.getDay()];
+                const dateString = now.toLocaleDateString('bn-BD', { year: 'numeric', month: 'long', day: 'numeric' });
+
+                const qrData = encodeURIComponent('MECARD:N:Al-Hikmah Tour & Travels;TEL:+8801914137050;EMAIL:alhikmahtourbd@gmail.com;;');
+                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${qrData}`;
+                
+                const logoUrl = 'https://raw.githubusercontent.com/NaeemNajm/pic/refs/heads/main/logo.png';
+
+                const header = `
+                    <div class="printable-header" style="border-bottom: 3px solid #4C51BF; display:flex; justify-content:space-between; align-items:center;">
+                        <img id="printable-logo" src="${logoUrl}" alt="Company Logo" crossorigin="anonymous" style="height: 50px;">
+                        <div style="text-align: right;">
+                            <h1 style="color: #4C51BF; font-size: 32px; margin:0;">আল-হিকমাহ ট্যুর অ্যান্ড ট্রাভেলস</h1>
+                            <p style="font-size: 14px; color: #718096; margin:0;">আপনার বিশ্বস্ত ভ্রমণ সঙ্গী</p>
+                        </div>
+                    </div>
+                    <div style="text-align:center; margin: 20px 0;">
+                        <h2 style="font-size: 24px; font-weight: 700; color: #2C5282;">পবিত্র উমরাহ যাত্রার চেকলিস্ট</h2>
+                        <p style="font-size: 16px; color: #DD6B20; margin-top: 8px;">প্রিয় ${guestName},<br>আপনার পবিত্র সফরের প্রস্তুতিতে সঙ্গী হতে পেরে আমরা আনন্দিত। মহান আল্লাহ আপনার প্রতিটি পদক্ষেপ কবুল করুন এবং এই যাত্রা আপনার জীবনের সেরা স্মৃতি হয়ে থাকুক।</p>
+                        <p style="font-size: 14px; color: #718096; margin-top: 15px;">তৈরির তারিখ: ${dateString}, ${dayName}</p>
+                    </div>
+                    <div style="background-color: #FEFCE8; border-left: 4px solid #FBBF24; color: #92400E; padding: 12px; margin: 20px 0; font-size: 14px; text-align: center; column-span: all;">
+                        <b>বিশেষ দ্রষ্টব্য:</b> সফরে যত কম सामान, তত বেশি আরাম। আপনার প্রয়োজন অনুযায়ী জিনিসপত্র নিন এবং অতিরিক্ত মালামাল বহন করা থেকে বিরত থাকুন।
+                    </div>
+                    `;
+                const footer = `
+                    <div class="printable-footer" style="border-top: 2px solid #4C51BF; display: flex; align-items: center; justify-content: space-between; padding-top: 15px;">
+                        <div style="text-align: left;">
+                            <h1 style="font-size: 20px; color: #4C51BF;">আপনার যাত্রা নিরাপদ ও কবুলযোগ্য হোক</h1>
+                            <p style="color: #4A5568;">যেকোনো প্রয়োজনে আমরা আছি আপনার পাশে।</p>
+                        </div>
+                        <div>
+                            <img id="printable-qr" src="${qrUrl}" alt="QR Code" crossorigin="anonymous" style="width: 80px; height: 80px;">
+                        </div>
+                    </div>`;
+                
+                container.innerHTML = `<div class="printable-content-wrapper">${header}<div class="printable-content">${contentHTML}</div>${footer}</div>`;
+                
+                const logoImg = container.querySelector('#printable-logo');
+                const qrImg = container.querySelector('#printable-qr');
+                const promises = [
+                    new Promise(resolve => { logoImg.onload = resolve; logoImg.onerror = resolve; }),
+                    new Promise(resolve => { qrImg.onload = resolve; qrImg.onerror = resolve; })
+                ];
+                await Promise.all(promises);
+            }
+
+            async function createWatermarkWithLogo() {
+                return new Promise((resolve) => {
+                    const logo = new Image();
+                    logo.crossOrigin = "anonymous";
+                    logo.src = 'https://raw.githubusercontent.com/NaeemNajm/pic/refs/heads/main/logo.png';
+
+                    logo.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = 400;
+                        canvas.height = 300;
+
+                        ctx.globalAlpha = 0.04;
+                        ctx.fillStyle = '#4C51BF';
+                        ctx.font = 'bold 18px Hind Siliguri';
+                        ctx.textAlign = 'center';
+
+                        ctx.translate(canvas.width / 2, canvas.height / 2);
+                        ctx.rotate(-Math.PI / 6);
+                        ctx.translate(-canvas.width / 2, -canvas.height / 2);
+
+                        ctx.drawImage(logo, 50, 80, 100, 33);
+                        ctx.fillText('আল-হিকমাহ', 250, 100);
+                        ctx.fillText('ট্যুর অ্যান্ড ট্রাভেলস', 150, 200);
+
+                        resolve(`url(${canvas.toDataURL()})`);
+                    };
+
+                    logo.onerror = () => {
+                        console.error("Logo could not be loaded for watermark.");
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = 300;
+                        canvas.height = 200;
+                        ctx.globalAlpha = 0.05;
+                        ctx.fillStyle = '#4C51BF';
+                        ctx.font = 'bold 16px Hind Siliguri';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.translate(150, 100);
+                        ctx.rotate(-Math.PI / 4);
+                        ctx.fillText('আল-হিকমাহ ট্যুর অ্যান্ড ট্রাভেলস', 0, 0);
+                        resolve(`url(${canvas.toDataURL()})`);
+                    };
+                });
+            }
+
+            function generateFullListHTML() {
+                let html = '';
+                const categories = Object.keys(checklistData);
+                categories.forEach((category, index) => {
+                    const data = checklistData[category];
+                    const breakClass = index === 5 ? 'list-break' : ''; // Break after 5th category for better balance
+                    html += `<div class="${breakClass}" style="page-break-inside: avoid;"><h3 style="font-size: 1.25rem; font-weight: 700; color: #2C5282; margin-top: 1.5rem; margin-bottom: 1rem; border-bottom: 2px solid #BEE3F8; padding-bottom: 0.5rem;">${data.title}</h3><ul style="list-style-type: none; padding: 0; margin-bottom: 1.5rem;">`;
+                    data.items.forEach(item => {
+                        const isEssential = item.name.startsWith('*');
+                        const cleanItem = isEssential ? item.name.substring(1) : item.name;
+                        const starIcon = isEssential ? '<span style="color: #C53030; font-weight: 600;">★</span>' : '☐';
+                        const bagTagStyle = `display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 500; padding: 2px 8px; border-radius: 9999px; line-height: 1.2; ${item.bag === 'হ্যান্ডব্যাগ' || item.bag === 'সাথে থাকবে' ? 'background-color: #EBF4FF; color: #3182CE; border: 1px solid #90CDF4;' : 'background-color: #FEEBC8; color: #DD6B20; border: 1px solid #FBD38D;'}`;
+                        html += `<li style="margin-bottom: 0.5rem; color: #4A5568; font-size: 16px; display: flex; justify-content: space-between; align-items: center;"><span>${starIcon} ${cleanItem}</span><span style="${bagTagStyle}">${item.bag}</span></li>`;
+                    });
+                    html += `</ul></div>`;
+                });
+                return html;
+            }
+
+            function generateCheckedListHTML() {
+                const checkedItemsByCat = {};
+                 document.querySelectorAll('.item-checkbox:checked').forEach(cb => {
+                    const categoryTitle = cb.dataset.title;
+                    if (!checkedItemsByCat[categoryTitle]) checkedItemsByCat[categoryTitle] = [];
+                    const isEssential = cb.dataset.essential === 'true';
+                    const starIcon = isEssential ? '<span style="color: #C53030; font-weight: 600;">★</span>' : '';
+                    const bag = cb.dataset.bag;
+                    const bagTagStyle = `display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 500; padding: 2px 8px; border-radius: 9999px; line-height: 1.2; ${bag === 'হ্যান্ডব্যাগ' || bag === 'সাথে থাকবে' ? 'background-color: #EBF4FF; color: #3182CE; border: 1px solid #90CDF4;' : 'background-color: #FEEBC8; color: #DD6B20; border: 1px solid #FBD38D;'}`;
+                    const bagTagHtml = `<span style="${bagTagStyle}">${bag}</span>`;
+                    checkedItemsByCat[categoryTitle].push({ text: `${starIcon} ${cb.nextElementSibling.textContent.trim()}`, bagTag: bagTagHtml });
+                });
+
+                if (Object.keys(checkedItemsByCat).length === 0) {
+                    alert('অনুগ্রহ করে প্রথমে কিছু আইটেম নির্বাচন করুন।');
+                    return null;
+                }
+                let html = `<h3 style="font-size: 1.5rem; font-weight: 700; color: #2C5282; margin-bottom: 1.5rem; text-align: center; column-span: all;">✅ আপনার গোছানো আইটেমসমূহ</h3>`;
+                Object.keys(checkedItemsByCat).forEach(categoryTitle => {
+                    html += `<div style="page-break-inside: avoid;"><h4 style="font-size: 1.2rem; font-weight: 600; color: #2D3748; margin-top: 1rem; margin-bottom: 0.5rem; border-bottom: 1px solid #CBD5E0; padding-bottom: 0.25rem;">${categoryTitle}</h4><ul style="list-style-type: none; padding: 0; margin-bottom: 1rem;">`;
+                    checkedItemsByCat[categoryTitle].forEach(item => {
+                        html += `<li style="margin-bottom: 0.5rem; color: #4A5568; font-size: 16px; display: flex; justify-content: space-between; align-items: center;"><span>☑ ${item.text}</span>${item.bagTag}</li>`;
+                    });
+                    html += `</ul></div>`;
+                });
+                return html;
+            }
+
+            renderChecklists();
+            
+            document.querySelectorAll('.tab-button').forEach(tab => tab.addEventListener('click', () => switchTab(tab)));
+            document.body.addEventListener('change', e => {
+                if (e.target.classList.contains('select-all-checkbox')) handleSelectAll(e);
+                if (e.target.classList.contains('item-checkbox')) handleItemCheck(e);
+            });
+
+            document.querySelectorAll('.download-btn').forEach(btn => btn.addEventListener('click', (e) => performAction(e.currentTarget, 'download')));
+            document.querySelectorAll('.print-btn').forEach(btn => btn.addEventListener('click', (e) => performAction(e.currentTarget, 'print')));
+            document.querySelectorAll('.share-btn').forEach(btn => btn.addEventListener('click', (e) => performAction(e.currentTarget, 'share')));
+
+            if (document.querySelectorAll('.tab-button').length > 0) {
+                switchTab(document.querySelector('.tab-button'));
+            }
+        });
+    </script>
+</body>
+</html>
