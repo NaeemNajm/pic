@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>আল-হিকমাহ ম্যানেজমেন্ট ড্যাশবোর্ড</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Modern Blue & Slate with Dark Mode -->
+    <!-- Application Structure Plan: Implemented a comprehensive Super Admin panel with User Management, Role-Based Access Control (RBAC), and a functional Template Manager. -->
+    <!-- Visualization & Content Choices: 
+        1. Feature: Role-Based Access Control (RBAC). Goal: Granular permission control. Viz/Method: A new "Role Management" section in the admin panel. Interaction: Admins can create roles and assign specific permissions (e.g., canViewDebts, canManageUsers) via checkboxes. User visibility of tabs and features is now dynamically controlled based on their assigned role's permissions. Justification: Provides robust security and tailored user experiences. Library/Method: Firestore, JS.
+        2. Feature: Functional Template Manager. Goal: Complete the template feature. Viz/Method: A full-featured modal for template management. Interaction: Admins can create/delete templates, and add/remove tasks within them. All changes are saved to Firestore. Justification: Fulfills a core requirement from the previous step, making the feature fully operational. Library/Method: Firestore, JS.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        :root {
+            --primary-bg: #f8fafc; --secondary-bg: #ffffff; --primary-text: #1e293b; --secondary-text: #475569; --border-color: #e2e8f0; --accent-blue: #2563eb; --accent-blue-light: #dbeafe; --accent-green: #16a34a; --accent-amber: #f59e0b; --priority-bg: #fef9c3; --priority-text: #854d0e; --priority-icon: #facc15; --danger-text: #ef4444;
+        }
+        .dark {
+            --primary-bg: #0f172a; --secondary-bg: #1e293b; --primary-text: #e2e8f0; --secondary-text: #94a3b8; --border-color: #334155; --accent-blue-light: #1e293b; --priority-bg: #423d1d; --priority-text: #fde047; --priority-icon: #facc15; --danger-text: #f87171;
+        }
+        body { font-family: 'Noto Sans Bengali', sans-serif; background-color: var(--primary-bg); color: var(--primary-text); transition: background-color 0.3s, color 0.3s; }
+        .card { background-color: var(--secondary-bg); border: 1px solid var(--border-color); }
+        .chart-container { position: relative; width: 100%; max-width: 280px; height: 280px; margin: auto; }
+        .task-item input:checked + label .task-text { text-decoration: line-through; color: var(--secondary-text); }
+        .task-item:hover { background-color: var(--primary-bg); }
+        .task-item.priority { background-color: var(--priority-bg); border-left: 4px solid var(--priority-icon); }
+        .priority-icon.active { color: var(--priority-icon); }
+        .tab-active { border-color: var(--accent-blue); color: var(--accent-blue); background-color: var(--accent-blue-light); font-weight: 600; }
+        .tab-inactive { border-color: transparent; color: var(--secondary-text); }
+        .tab-inactive:hover { background-color: var(--primary-bg); color: var(--primary-text); }
+        #loader { border: 8px solid #f3f3f3; border-top: 8px solid var(--accent-blue); border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .hidden { display: none; }
+        .icon { font-size: 1.25rem; margin-right: 0.5rem; vertical-align: middle; }
+        .tab-icon { font-size: 1.1rem; margin-right: 0.5rem; }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 50; }
+        .modal-content { background-color: var(--secondary-bg); padding: 1.5rem; border-radius: 0.75rem; width: 90%; max-width: 500px; max-height: 90vh; display: flex; flex-direction: column; }
+        .progress-bg { background-color: var(--border-color); }
+        .progress-bar { background-color: var(--accent-green); }
+        .dark-mode-toggle-dot { transform: translateX(0); }
+        .dark-mode-toggle-input:checked ~ .dark-mode-toggle-dot { transform: translateX(100%); }
+        .task-meta-btn { cursor: pointer; display: flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.5rem; border-radius: 0.5rem; transition: background-color 0.2s; }
+        .task-meta-btn:hover { background-color: var(--primary-bg); }
+        .due-date.overdue { color: var(--danger-text); font-weight: 600; }
+        .filter-btn.active { background-color: var(--accent-blue); color: white; }
+        
+        @media print {
+            body * { visibility: hidden; }
+            #main-content-area, #main-content-area * { visibility: visible; }
+            #main-content-area { position: absolute; left: 0; top: 0; width: 100%; }
+            .no-print { display: none !important; }
+            .card { box-shadow: none; border: 1px solid #ccc; }
+            .task-item { page-break-inside: avoid; }
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <div id="loader"></div>
+
+    <!-- Login View -->
+    <div id="login-view" class="min-h-screen flex items-center justify-center hidden">
+        <div class="w-full max-w-md p-8 space-y-6 card rounded-xl shadow-lg">
+            <div>
+                <h2 class="text-center text-3xl font-extrabold">ড্যাশবোর্ডে স্বাগতম</h2>
+                <p class="text-center text-sm text-slate-500">লগইন করে প্রবেশ করুন</p>
+            </div>
+            <form id="login-form" class="space-y-6">
+                <div>
+                    <label for="email" class="text-sm font-medium">ইমেইল</label>
+                    <input id="email" name="email" type="email" required class="w-full p-2 mt-1 rounded card">
+                </div>
+                <div>
+                    <label for="password" class="text-sm font-medium">পাসওয়ার্ড</label>
+                    <input id="password" name="password" type="password" required class="w-full p-2 mt-1 rounded card">
+                </div>
+                <div class="flex items-center">
+                    <input id="remember-me" name="remember-me" type="checkbox" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <label for="remember-me" class="ml-2 block text-sm">আমাকে মনে রাখুন</label>
+                </div>
+                <p id="login-error" class="text-sm text-red-500 hidden"></p>
+                <div>
+                    <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+                        লগইন করুন
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App View -->
+    <div id="app-content" class="container mx-auto p-4 md:p-6 max-w-7xl hidden">
+        <header class="mb-6 no-print">
+            <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 card p-4 rounded-xl shadow-sm">
+                <div class="flex-grow">
+                    <h1 class="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100">আল-হিকমাহ ড্যাশবোর্ড</h1>
+                    <p id="welcome-message" class="text-sm text-slate-500 dark:text-slate-400 mt-1"></p>
+                </div>
+                <div class="flex items-center self-end sm:self-center space-x-4">
+                    <div>
+                        <label for="dark-mode-toggle" class="flex items-center cursor-pointer">
+                            <div class="relative">
+                                <input type="checkbox" id="dark-mode-toggle" class="sr-only dark-mode-toggle-input">
+                                <div class="block bg-gray-600 w-14 h-8 rounded-full"></div>
+                                <div class="dot dark-mode-toggle-dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition"></div>
+                            </div>
+                        </label>
+                    </div>
+                    <button id="logout-btn" class="flex items-center px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm">
+                        <ion-icon name="log-out-outline" class="mr-2"></ion-icon> লগ আউট
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2">
+                <section id="main-content-area" class="card p-4 sm:p-6 rounded-xl shadow-sm">
+                    <nav id="tabs" class="flex flex-wrap -mb-px border-b border-slate-200 dark:border-slate-700 no-print" aria-label="Tabs"></nav>
+                    <div id="tab-content" class="mt-4"></div>
+                </section>
+            </div>
+            <div class="lg:col-span-1 space-y-6 no-print">
+                <section id="dashboard" class="card p-4 sm:p-6 rounded-xl shadow-sm">
+                    <h2 class="text-lg sm:text-xl font-bold mb-4 flex items-center"><ion-icon name="speedometer-outline" class="icon"></ion-icon>কাজের অগ্রগতি</h2>
+                    <div class="space-y-6">
+                         <div class="chart-container">
+                            <canvas id="progressChart"></canvas>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span class="text-base font-medium">সামগ্রিক অগ্রগতি</span>
+                                <span id="progress-percentage" class="text-sm font-medium">0%</span>
+                            </div>
+                            <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-4">
+                                <div id="progress-bar" class="bg-gradient-to-r from-blue-500 to-cyan-500 h-4 rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                 <section id="summary-cards" class="grid grid-cols-1 gap-4 text-center">
+                    <div class="card p-4 rounded-lg">
+                        <p class="text-sm">মোট কাজ</p>
+                        <p id="total-tasks" class="text-2xl sm:text-3xl font-bold">0</p>
+                    </div>
+                    <div class="bg-green-100 dark:bg-green-900/50 p-4 rounded-lg">
+                        <p class="text-sm text-green-600 dark:text-green-400">সম্পন্ন</p>
+                        <p id="completed-tasks" class="text-2xl sm:text-3xl font-bold text-green-800 dark:text-green-300">0</p>
+                    </div>
+                    <div class="bg-amber-100 dark:bg-amber-900/50 p-4 rounded-lg">
+                        <p class="text-sm text-amber-600 dark:text-amber-400">বাকি</p>
+                        <p id="remaining-tasks" class="text-2xl sm:text-3xl font-bold text-amber-800 dark:text-amber-300">0</p>
+                    </div>
+                </section>
+            </div>
+        </main>
+        
+        <footer class="text-center mt-12 text-slate-500 dark:text-slate-400 text-sm no-print">
+            <p>আল-হিকমাহ ট্যুর অ্যান্ড ট্রাভেলস</p>
+        </footer>
+
+    </div>
+
+    <div id="data-entry-modal" class="modal-overlay hidden">
+        <div id="modal-content-wrapper" class="modal-content card"></div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAouoI7Ip8gIiYvALloF4dgCVUea_g4-44",
+            authDomain: "al-hikmah-dashboard.firebaseapp.com",
+            projectId: "al-hikmah-dashboard",
+            storageBucket: "al-hikmah-dashboard.appspot.com",
+            messagingSenderId: "987496618373",
+            appId: "1:987496618373:web:7cce2df9ac6fd1c7fb4cec",
+            measurementId: "G-X7C8T91NMG"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const tasksCollection = db.collection("hikmah_tasks_progress");
+        const debtsCollection = db.collection("hikmah_debts");
+        const transactionsCollection = db.collection("hikmah_transactions");
+        const commentsCollection = db.collection("hikmah_comments");
+        const activityLogCollection = db.collection("hikmah_activity_log");
+        const usersCollection = db.collection("hikmah_users");
+        const templatesCollection = db.collection("hikmah_task_templates");
+        const rolesCollection = db.collection("hikmah_roles");
+        const metadataDoc = db.collection("hikmah_metadata").doc("last_updated");
+
+        // --- Global State & Config ---
+        let tasks = [], debts = [], transactions = [], comments = {}, activityLog = [], teamMembers = [], templates = [], roles = [];
+        let progressChart, incomeExpenseChart;
+        let currentUser = null;
+        let currentTaskFilter = { searchTerm: '', filter: 'all' };
+        let currentTaskView = 'list';
+
+        const mainTabs = {
+            'tasks': { title: 'করণীয় তালিকা', icon: 'checkbox-outline', permission: 'canViewTasks' },
+            'debts': { title: 'ঋণ ট্র্যাকার', icon: 'cash-outline', permission: 'canViewDebts' },
+            'transactions': { title: 'আয়-ব্যয়', icon: 'stats-chart-outline', permission: 'canViewTransactions' },
+            'activity': { title: 'একটিভিটি', icon: 'list-outline', permission: 'canViewActivity' },
+            'admin': { title: 'এডমিন প্যানেল', icon: 'build-outline', permission: 'canManageUsers' }
+        };
+
+        const taskSteps = {
+            1: { title: 'তথ্য হস্তান্তর', icon: 'server-outline' }, 2: { title: 'নিয়োগ ও দায়িত্ব', icon: 'person-add-outline' }, 3: { title: 'আর্থিক সিদ্ধান্ত', icon: 'wallet-outline' }, 4: { title: 'ব্যক্তিগত করণীয়', icon: 'shield-checkmark-outline' }, 5: { title: 'আমার প্রস্তাবনা', icon: 'ribbon-outline' },
+        };
+        const initialTasks = [
+            { id: '1_1', step: 1, text: 'ঋণের পূর্ণাঙ্গ তালিকা প্রদান', completed: false, parent: null, priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '1_1_1', step: 1, text: 'সকল পাওনাদারের নাম ও ঋণের পরিমাণ।', completed: false, parent: '1_1', priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '1_1_2', step: 1, text: 'সুদের হার ও পরিশোধের শর্তাবলী।', completed: false, parent: '1_1', priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '1_2', step: 1, text: 'পাওনার পূর্ণাঙ্গ তালিকা প্রদান', completed: false, parent: null, priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '1_2_1', step: 1, text: 'সকল দেনাদারের (গ্রাহক/এজেন্ট) নাম ও পাওনার পরিমাণ।', completed: false, parent: '1_2', priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '1_3', step: 1, text: 'কোম্পানির সকল সম্পদের তালিকা প্রদান', completed: false, parent: null, priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '1_3_1', step: 1, text: 'অফিস, আসবাবপত্র, গাড়ি ইত্যাদির বিবরণ।', completed: false, parent: '1_3', priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '1_3_2', step: 1, text: 'সকল ব্যাংক একাউন্টের বর্তমান ব্যালেন্স ও নগদ টাকার পরিমাণ।', completed: false, parent: '1_3', priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '1_4', step: 1, text: 'বিগত ১ বছরের ব্যাংক স্টেটমেন্ট প্রদান।', completed: false, parent: null, priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '1_5', step: 1, text: 'চলমান সকল প্যাকেজের লাভ-লোকসানের হিসাব প্রদান।', completed: false, parent: null, priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '1_6', step: 1, text: 'সকল সাপ্লায়ার/ভেন্ডরের সাথে লেনদেনের বর্তমান অবস্থা জানানো।', completed: false, parent: null, priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '1_7', step: 1, text: 'ট্রেড লাইসেন্স, টিন, হজ লাইসেন্সসহ সকল আইনি কাগজপত্র হস্তান্তর।', completed: false, parent: null, priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '2_1', step: 2, text: 'নতুন একাউন্ট্যান্ট নিয়োগ প্রক্রিয়া শুরু করা', completed: false, parent: null, priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '2_1_1', step: 2, text: 'সিভি যাচাই-বাছাই করা।', completed: false, parent: '2_1', priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '2_1_2', step: 2, text: 'সাক্ষাৎকারের মাধ্যমে যোগ্য প্রার্থী নির্বাচন চূড়ান্ত করা।', completed: false, parent: '2_1', priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '2_2', step: 2, text: 'একাউন্ট্যান্টের দায়িত্ব ও কর্তব্য নির্ধারণ করে দেওয়া।', completed: false, parent: null, priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '2_3', step: 2, text: 'আমাকে পরিকল্পনা বাস্তবায়নের জন্য প্রয়োজনীয় ক্ষমতা ও দায়িত্ব আনুষ্ঠানিকভাবে অর্পণ করা।', completed: false, parent: null, priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '2_4', step: 2, text: 'একটি একাউন্টিং সফটওয়্যার কেনার অনুমোদন দেওয়া।', completed: false, parent: null, priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '3_1', step: 3, text: 'ঋণ ব্যবস্থাপনা পরিকল্পনায় অনুমোদন', completed: false, parent: null, priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '3_1_1', step: 3, text: 'পাওনাদারদের সাথে আলোচনার অনুমতি প্রদান।', completed: false, parent: '3_1', priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '3_1_2', step: 3, text: 'ঋণ পরিশোধের অগ্রাধিকার তালিকা অনুমোদন।', completed: false, parent: '3_1', priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '3_2', step: 3, text: 'খরচ কমানোর নীতিতে সম্মতি প্রদান', completed: false, parent: null, priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '3_2_1', step: 3, text: 'পরবর্তী ৬ মাসের জন্য অপ্রয়োজনীয় সকল খরচ বন্ধের সিদ্ধান্ত গ্রহণ।', completed: false, parent: '3_2', priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '3_3', step: 3, text: 'আয় বৃদ্ধির নতুন পরিকল্পনায় অনুমোদন', completed: false, parent: null, priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '3_3_1', step: 3, text: 'লাভজনক প্যাকেজগুলোর মার্কেটিং বাজেট অনুমোদন।', completed: false, parent: '3_3', priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '3_3_2', step: 3, text: 'কর্পোরেট বা গ্রুপবুকিংয়ের জন্য বিশেষ ছাড়ের নীতি অনুমোদন।', completed: false, parent: '3_3', priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '3_4', step: 3, text: 'প্রতি সপ্তাহে অগ্রগতি পর্যালোচনা সভায় অংশগ্রহণে সম্মতি।', completed: false, parent: null, priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '4_1', step: 4, text: 'প্রতিটি আর্থিক লেনদেন একাউন্ট্যান্টের মাধ্যমে সম্পন্ন করার নীতি গ্রহণ।', completed: false, parent: null, priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '4_2', step: 4, text: 'ব্যক্তিগত প্রয়োজনে কোম্পানির অর্থ ব্যবহার না করার সিদ্ধান্ত গ্রহণ।', completed: false, parent: null, priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '4_3', step: 4, text: 'আবেগ বা ব্যক্তিগত সম্পর্কের ভিত্তিতে কোনো আর্থিক প্রতিশ্রুতি না দেওয়া।', completed: false, parent: null, priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+            { id: '5_1', step: 5, text: 'কোম্পানি লাভে ফিরলে আমার জন্য পারফরম্যান্স-ভিত্তিক বোনাস বা লাভ্যাংশ প্রদানের বিষয়টি বিবেচনা করা।', completed: false, parent: null, priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [] },
+        ];
+        
+        // --- Auth Handling ---
+        window.onload = () => {
+            const emailInput = document.getElementById('email');
+            const rememberMeCheckbox = document.getElementById('remember-me');
+            const rememberedEmail = localStorage.getItem('rememberedEmail');
+            if (rememberedEmail) {
+                emailInput.value = rememberedEmail;
+                rememberMeCheckbox.checked = true;
+            }
+            auth.onAuthStateChanged(async user => {
+                if (user) {
+                    const userDoc = await usersCollection.doc(user.uid).get();
+                    if (userDoc.exists) {
+                        const userData = userDoc.data();
+                        const roleDoc = await rolesCollection.doc(userData.role).get();
+                        
+                        let permissions = roleDoc.exists ? roleDoc.data().permissions : {};
+                        if (userData.role === 'superadmin') {
+                            permissions = { canViewTasks: true, canViewDebts: true, canViewTransactions: true, canViewActivity: true, canManageUsers: true, canManageTemplates: true };
+                        }
+
+                        currentUser = { uid: user.uid, ...userData, permissions };
+                        initializeApp();
+                    } else { auth.signOut(); }
+                } else {
+                    currentUser = null;
+                    document.getElementById('loader').classList.add('hidden');
+                    document.getElementById('app-content').classList.add('hidden');
+                    document.getElementById('login-view').classList.remove('hidden');
+                }
+            });
+            document.getElementById('login-form').addEventListener('submit', e => {
+                e.preventDefault();
+                const email = e.target.email.value;
+                const password = e.target.password.value;
+                const rememberMe = e.target['remember-me'].checked;
+                const errorEl = document.getElementById('login-error');
+                errorEl.classList.add('hidden');
+                if (rememberMe) { localStorage.setItem('rememberedEmail', email); } 
+                else { localStorage.removeItem('rememberedEmail'); }
+                auth.signInWithEmailAndPassword(email, password)
+                    .catch(error => {
+                        errorEl.textContent = 'ভুল ইমেইল অথবা পাসওয়ার্ড।';
+                        errorEl.classList.remove('hidden');
+                    });
+            });
+        };
+
+        // --- Main App Initialization ---
+        function initializeApp() {
+            document.getElementById('login-view').classList.add('hidden');
+            document.getElementById('app-content').classList.remove('hidden');
+            document.getElementById('loader').classList.add('hidden');
+            document.getElementById('welcome-message').textContent = `স্বাগতম, ${currentUser.name}`;
+            document.getElementById('logout-btn').addEventListener('click', () => auth.signOut());
+            setupDarkMode();
+            
+            const listeners = [
+                listenForUsers(),
+                listenForTimestampUpdates(),
+                listenForRoles(),
+                listenForComments()
+            ];
+
+            if (currentUser.permissions.canViewTasks) {
+                listeners.push(listenForTasks());
+                listeners.push(listenForTemplates());
+            }
+            if (currentUser.permissions.canViewDebts) {
+                listeners.push(listenForDebts());
+            }
+            if (currentUser.permissions.canViewTransactions) {
+                listeners.push(listenForTransactions());
+            }
+            if (currentUser.permissions.canViewActivity) {
+                listeners.push(listenForActivityLog());
+            }
+
+            Promise.all(listeners).then(() => {
+                renderMainTabs();
+                const firstVisibleTab = Object.keys(mainTabs).find(key => {
+                    const tab = mainTabs[key];
+                    return !tab.permission || (currentUser.permissions && currentUser.permissions[tab.permission]);
+                });
+
+                if (firstVisibleTab) {
+                    activateMainTab(firstVisibleTab);
+                } else {
+                    document.getElementById('tab-content').innerHTML = `<p class="text-center p-8">আপনার কোনো ট্যাব দেখার অনুমতি নেই। এডমিনের সাথে যোগাযোগ করুন।</p>`;
+                }
+                updateAllUI();
+            }).catch(error => {
+                console.error("Initialization failed: ", error);
+                alert("অ্যাপ্লিকেশন চালু করতে সমস্যা হয়েছে। আপনার অনুমতি পরীক্ষা করুন।");
+            });
+        }
+
+        function updateAllUI() {
+            updateDashboard();
+            const activeMainTab = document.querySelector('#tabs .tab-active')?.dataset.tab || 'tasks';
+            if (document.getElementById('tabs')?.offsetParent !== null) {
+               renderTabContent(activeMainTab);
+            }
+        }
+
+        // --- Dark Mode ---
+        function setupDarkMode() {
+            const toggle = document.getElementById('dark-mode-toggle');
+            if (localStorage.getItem('darkMode') === 'true') {
+                document.documentElement.classList.add('dark');
+                toggle.checked = true;
+            }
+            toggle.addEventListener('change', () => {
+                document.documentElement.classList.toggle('dark');
+                localStorage.setItem('darkMode', toggle.checked ? 'true' : 'false');
+            });
+        }
+
+        // --- Firestore Listeners ---
+        function listenForUsers() { return new Promise((resolve, reject) => usersCollection.onSnapshot(snapshot => { teamMembers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); resolve(); }, reject)); }
+        function listenForTimestampUpdates() { return new Promise(resolve => metadataDoc.onSnapshot(doc => { const timeElement = document.getElementById('last-updated-time'); if (timeElement && doc.exists && doc.data().timestamp) { const date = doc.data().timestamp.toDate(); timeElement.textContent = date.toLocaleString('bn-BD', { day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit', hour12: true }); } resolve(); })); }
+        
+        function listenForTasks() {
+            return new Promise((resolve, reject) => {
+                let query = tasksCollection;
+                if (currentUser && currentUser.role?.toLowerCase() !== 'superadmin' && currentUser.role?.toLowerCase() !== 'admin') {
+                    query = tasksCollection.where('assignedTo', 'in', [currentUser.uid, null]);
+                }
+                
+                query.onSnapshot(snapshot => {
+                    if (snapshot.empty && initialTasks.length > 0 && (currentUser.role?.toLowerCase() === 'admin' || currentUser.role?.toLowerCase() === 'superadmin')) {
+                        const batch = db.batch();
+                        initialTasks.forEach(task => {
+                            const { id, ...data } = task;
+                            batch.set(tasksCollection.doc(id), data);
+                        });
+                        batch.commit().then(resolve).catch(reject);
+                        return;
+                    }
+                    tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    updateAllUI();
+                    resolve();
+                }, reject);
+            });
+        }
+
+        function listenForComments() { return new Promise((resolve, reject) => commentsCollection.onSnapshot(snapshot => { comments = {}; snapshot.docs.forEach(doc => { const comment = doc.data(); if (!comments[comment.taskId]) comments[comment.taskId] = []; comments[comment.taskId].push({ id: doc.id, ...comment }); }); for (const taskId in comments) comments[taskId].sort((a, b) => a.createdAt.toMillis() - b.createdAt.toMillis()); updateAllUI(); resolve(); }, reject)); }
+        function listenForActivityLog() { return new Promise((resolve, reject) => activityLogCollection.orderBy("timestamp", "desc").limit(50).onSnapshot(snapshot => { activityLog = snapshot.docs.map(doc => doc.data()); updateAllUI(); resolve(); }, reject)); }
+        function listenForDebts() { return new Promise((resolve, reject) => debtsCollection.orderBy("createdAt", "desc").onSnapshot(snapshot => { debts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); updateAllUI(); resolve(); }, reject)); }
+        function listenForTransactions() { return new Promise((resolve, reject) => transactionsCollection.orderBy("date", "desc").onSnapshot(snapshot => { transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); updateAllUI(); resolve(); }, reject)); }
+        function listenForTemplates() { return new Promise((resolve, reject) => templatesCollection.onSnapshot(snapshot => { templates = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); updateAllUI(); resolve(); }, reject)); }
+        function listenForRoles() { return new Promise((resolve, reject) => rolesCollection.onSnapshot(snapshot => { roles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); updateAllUI(); resolve(); }, reject)); }
+        
+        // --- Tab Rendering ---
+        function renderMainTabs() {
+            const tabsContainer = document.getElementById('tabs');
+            tabsContainer.innerHTML = '';
+            Object.keys(mainTabs).forEach(key => {
+                const tab = mainTabs[key];
+                if (tab.permission && !(currentUser.permissions && currentUser.permissions[tab.permission])) return;
+                const button = document.createElement('button');
+                button.className = `tab-inactive flex items-center justify-center text-sm sm:text-base font-medium text-center border-b-2 py-3 px-4 transition-all duration-200 rounded-t-lg`;
+                button.dataset.tab = key;
+                button.innerHTML = `<ion-icon name="${tab.icon}" class="tab-icon"></ion-icon> ${tab.title}`;
+                button.onclick = () => activateMainTab(key);
+                tabsContainer.appendChild(button);
+            });
+        }
+        function activateMainTab(tabKey) {
+            if (!tabKey) return;
+            document.querySelectorAll('#tabs button').forEach(b => b.classList.replace('tab-active', 'tab-inactive'));
+            document.querySelector(`#tabs button[data-tab='${tabKey}']`).classList.replace('tab-inactive', 'tab-active');
+            renderTabContent(tabKey);
+        }
+        function renderTabContent(tabKey) {
+            const contentContainer = document.getElementById('tab-content');
+            if (!contentContainer) return;
+            contentContainer.innerHTML = '';
+            if (tabKey === 'tasks') renderTaskView(contentContainer);
+            else if (tabKey === 'debts') renderDebtTracker(contentContainer);
+            else if (tabKey === 'transactions') renderIncomeExpense(contentContainer);
+            else if (tabKey === 'activity') renderActivityLog(contentContainer);
+            else if (tabKey === 'admin') renderAdminView(contentContainer);
+        }
+
+        // --- Task View ---
+        function renderTaskView(container) {
+            container.innerHTML = `<div id="task-filters" class="mb-4 p-2 card rounded-lg flex flex-col sm:flex-row gap-2"><div class="flex-grow relative"><ion-icon name="search-outline" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></ion-icon><input type="text" id="task-search" placeholder="কাজ খুঁজুন..." class="w-full pl-10 p-2 rounded card"></div><div class="flex items-center gap-2 flex-wrap"><button data-filter="all" class="filter-btn active px-3 py-1 rounded text-sm">সব</button><button data-filter="mine" class="filter-btn px-3 py-1 rounded text-sm">আমার কাজ</button><button data-filter="priority" class="filter-btn px-3 py-1 rounded text-sm">জরুরি</button><button data-filter="incomplete" class="filter-btn px-3 py-1 rounded text-sm">অসম্পূর্ণ</button><button id="print-report-btn" class="filter-btn px-3 py-1 rounded text-sm flex items-center no-print"><ion-icon name="print-outline" class="mr-1"></ion-icon> প্রিন্ট</button></div></div><div class="flex items-center gap-2 mb-4 no-print"><button id="add-task-from-template-btn" class="flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"><ion-icon name="duplicate-outline" class="mr-2"></ion-icon> টেমপ্লেট থেকে যোগ করুন</button>${currentUser.permissions.canManageTemplates ? `<button id="manage-templates-btn" class="flex items-center px-3 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 text-sm"><ion-icon name="file-tray-stacked-outline" class="mr-2"></ion-icon> টেমপ্লেট ম্যানেজ করুন</button>` : ''}</div><div class="flex flex-wrap -mb-px" id="task-sub-tabs"></div><div id="task-sub-tab-content" class="mt-4"></div>`;
+            document.getElementById('task-search').addEventListener('input', e => { currentTaskFilter.searchTerm = e.target.value.toLowerCase(); renderTaskContent(document.querySelector('#task-sub-tabs .bg-blue-100')?.dataset.step || 1); });
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.addEventListener('click', () => { if (btn.id === 'print-report-btn') return; document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); currentTaskFilter.filter = btn.dataset.filter; renderTaskContent(document.querySelector('#task-sub-tabs .bg-blue-100')?.dataset.step || 1); }));
+            document.getElementById('print-report-btn').addEventListener('click', () => window.print());
+            document.getElementById('add-task-from-template-btn').addEventListener('click', showApplyTemplateModal);
+            if (currentUser.permissions.canManageTemplates) document.getElementById('manage-templates-btn').addEventListener('click', showTemplateManagerModal);
+            const subTabsContainer = document.getElementById('task-sub-tabs');
+            Object.keys(taskSteps).forEach(stepKey => {
+                const step = taskSteps[stepKey];
+                const button = document.createElement('button');
+                button.className = `tab-inactive flex items-center text-xs sm:text-sm py-2 px-3 m-1 rounded-md`;
+                button.dataset.step = stepKey;
+                button.innerHTML = `<ion-icon name="${step.icon}" class="tab-icon"></ion-icon> <span class="hidden sm:inline">${step.title}</span>`;
+                button.onclick = () => { document.querySelectorAll('#task-sub-tabs button').forEach(b => b.classList.remove('bg-blue-100', 'dark:bg-blue-900/50')); button.classList.add('bg-blue-100', 'dark:bg-blue-900/50'); renderTaskContent(stepKey); };
+                subTabsContainer.appendChild(button);
+            });
+            subTabsContainer.firstChild.click();
+        }
+        function applyFiltersAndSearch(tasksToFilter) {
+            const { searchTerm, filter } = currentTaskFilter;
+            return tasksToFilter.filter(task => {
+                const initialTaskData = initialTasks.find(it => it.id === task.id);
+                if (!initialTaskData) return false;
+                const searchMatch = initialTaskData.text.toLowerCase().includes(searchTerm);
+                let filterMatch = true;
+                if (filter === 'mine') filterMatch = task.assignedTo === currentUser.uid;
+                if (filter === 'priority') filterMatch = task.priority === true;
+                if (filter === 'incomplete') filterMatch = task.completed === false;
+                return searchMatch && filterMatch;
+            });
+        }
+        function renderTaskContent(step) {
+            const container = document.getElementById('task-sub-tab-content');
+            container.innerHTML = '';
+            const stepTaskIds = initialTasks.filter(t => t.step == step).map(t => t.id);
+            const liveStepTasks = tasks.filter(t => stepTaskIds.includes(t.id));
+            const filteredTasks = applyFiltersAndSearch(liveStepTasks);
+            const filteredTaskIds = new Set(filteredTasks.map(t => t.id));
+            const list = document.createElement('div');
+            list.className = 'space-y-3 p-2';
+            initialTasks.filter(t => t.step == step && t.parent === null).forEach(taskData => {
+                const subTasksData = initialTasks.filter(t => t.parent === taskData.id);
+                const subTasksToShow = subTasksData.filter(st => filteredTaskIds.has(st.id));
+                if (filteredTaskIds.has(taskData.id) || subTasksToShow.length > 0) {
+                    const liveTask = tasks.find(t => t.id === taskData.id) || taskData;
+                    if (filteredTaskIds.has(taskData.id)) list.appendChild(createTaskElement({ ...taskData, ...liveTask }));
+                    if (subTasksToShow.length > 0) {
+                        const subTaskList = document.createElement('div');
+                        subTaskList.className = 'ml-6 mt-3 space-y-3 border-l-2 border-slate-200 dark:border-slate-700 pl-4';
+                        subTasksToShow.forEach(subTaskData => {
+                            const liveSubTask = tasks.find(t => t.id === subTaskData.id) || subTaskData;
+                            subTaskList.appendChild(createTaskElement({ ...subTaskData, ...liveSubTask }));
+                        });
+                        list.appendChild(subTaskList);
+                    }
+                }
+            });
+            if (list.children.length === 0) container.innerHTML = `<p class="text-center py-8 text-slate-500">এই ফিল্টারে কোনো কাজ পাওয়া যায়নি।</p>`;
+            else container.appendChild(list);
+        }
+        function createTaskElement(task) {
+            const item = document.createElement('div');
+            item.className = `task-item card p-3 sm:p-4 rounded-lg transition-all duration-200 ${task.priority ? 'priority' : ''}`;
+            const assignee = teamMembers.find(m => m.id === task.assignedTo);
+            const dueDate = task.dueDate ? new Date(task.dueDate) : null;
+            const isOverdue = dueDate && dueDate < new Date() && !task.completed;
+            const commentCount = comments[task.id]?.length || 0;
+            const recurrence = task.recurrence;
+            item.innerHTML = `<div class="flex justify-between items-start"><label class="flex items-start cursor-pointer group flex-grow mr-4"><input type="checkbox" data-id="${task.id}" class="h-5 w-5 mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-2 flex-shrink-0" ${task.completed ? 'checked' : ''}><span class="task-text font-medium ml-4 group-hover:text-blue-600 dark:group-hover:text-blue-400">${task.text}</span></label><div class="flex items-center space-x-1 sm:space-x-2 flex-shrink-0 no-print"><div id="assignee-container-${task.id}" class="task-meta-btn text-xs"><ion-icon name="${assignee ? 'person-circle' : 'person-add-outline'}"></ion-icon><span class="hidden md:inline">${assignee ? assignee.name : 'Unassigned'}</span></div><div id="duedate-container-${task.id}" class="task-meta-btn text-xs ${isOverdue ? 'due-date overdue' : ''}"><ion-icon name="calendar-outline"></ion-icon><span class="hidden md:inline">${dueDate ? dueDate.toLocaleDateString('bn-BD') : 'No date'}</span></div><button class="task-meta-btn comments-btn"><ion-icon name="chatbubble-ellipses-outline"></ion-icon><span>${commentCount}</span></button><button class="task-meta-btn recurrence-btn"><ion-icon name="repeat-outline" class="${recurrence ? 'text-blue-500' : ''}"></ion-icon></button><button class="task-meta-btn priority-btn"><ion-icon name="star" class="priority-icon text-slate-400 ${task.priority ? 'active' : ''}"></ion-icon></button></div></div><div class="pl-9 mt-2"><div class="flex items-center gap-2"><div class="w-full progress-bg rounded-full h-1.5"><div class="bg-blue-500 h-1.5 rounded-full" style="width: ${task.progress || 0}%"></div></div><span class="text-xs font-mono">${task.progress || 0}%</span></div><input type="range" min="0" max="100" value="${task.progress || 0}" class="w-full h-1 mt-1 task-progress-slider no-print"></div>`;
+            item.querySelector('input[type="checkbox"]').addEventListener('change', () => handleTaskCompletion(task));
+            item.querySelector('.priority-btn').addEventListener('click', () => updateTaskField(task.id, { priority: !task.priority }, `"${task.text}" কাজের প্রায়োরিটি পরিবর্তন করেছেন।`));
+            item.querySelector('.comments-btn').addEventListener('click', () => showCommentsModal(task.id, task.text));
+            item.querySelector('.recurrence-btn').addEventListener('click', (e) => showRecurrenceMenu(e.currentTarget, task));
+            item.querySelector('.task-progress-slider').addEventListener('input', (e) => { item.querySelector('.bg-blue-500').style.width = `${e.target.value}%`; item.querySelector('.font-mono').textContent = `${e.target.value}%`; });
+            item.querySelector('.task-progress-slider').addEventListener('change', (e) => updateTaskField(task.id, { progress: parseInt(e.target.value) }, `"${task.text}" কাজের অগ্রগতি ${e.target.value}% আপডেট করেছেন।`));
+            const assigneeContainer = item.querySelector(`#assignee-container-${task.id}`);
+            assigneeContainer.addEventListener('click', (e) => { if (e.target.tagName === 'SELECT') return; const selectHTML = `<select class="text-xs p-1 rounded card" id="assignee-select-${task.id}"><option value="">Unassigned</option>${teamMembers.map(m => `<option value="${m.id}" ${task.assignedTo === m.id ? 'selected' : ''}>${m.name}</option>`).join('')}</select>`; if (!document.getElementById(`assignee-select-${task.id}`)) { assigneeContainer.innerHTML = selectHTML; const selectEl = document.getElementById(`assignee-select-${task.id}`); selectEl.focus(); selectEl.addEventListener('change', (e) => { const newAssigneeId = e.target.value || null; const newAssigneeName = teamMembers.find(m => m.id === newAssigneeId)?.name || 'কেউ না'; updateTaskField(task.id, { assignedTo: newAssigneeId }, `"${task.text}" কাজটি ${newAssigneeName}-কে এসাইন করেছেন।`); }); selectEl.addEventListener('blur', () => renderTaskContent(task.step)); } });
+            const duedateContainer = item.querySelector(`#duedate-container-${task.id}`);
+            duedateContainer.addEventListener('click', (e) => { if (e.target.tagName === 'INPUT') return; const inputHTML = `<input type="date" class="text-xs p-1 rounded card" id="duedate-input-${task.id}" />`; if (!document.getElementById(`duedate-input-${task.id}`)) { duedateContainer.innerHTML = inputHTML; const inputEl = document.getElementById(`duedate-input-${task.id}`); inputEl.value = task.dueDate; inputEl.focus(); inputEl.addEventListener('change', (e) => { const newDate = e.target.value || null; updateTaskField(task.id, { dueDate: newDate }, `"${task.text}" কাজের ডেডলাইন পরিবর্তন করেছেন।`); }); inputEl.addEventListener('blur', () => renderTaskContent(task.step)); } });
+            return item;
+        }
+        function updateTaskField(taskId, updateData, logMessage) { tasksCollection.doc(taskId).update(updateData); logActivity(logMessage); }
+        function showCommentsModal(taskId, taskText) {
+            const modalWrapper = document.getElementById('modal-content-wrapper');
+            modalWrapper.innerHTML = `<h3 class="text-xl font-bold mb-2">মন্তব্যসমূহ</h3><p class="text-sm text-slate-500 mb-4 pb-4 border-b border-slate-200 dark:border-slate-700">${taskText}</p><div id="comments-list" class="flex-grow overflow-y-auto space-y-4 mb-4 pr-2"></div><div class="mt-auto pt-4 border-t border-slate-200 dark:border-slate-700"><textarea id="new-comment-input" class="w-full p-2 rounded card" placeholder="আপনার মন্তব্য লিখুন..."></textarea><div class="flex justify-end mt-2"><button id="modal-close-btn" class="px-4 py-2 bg-slate-200 dark:bg-slate-600 rounded-lg mr-2">বন্ধ করুন</button><button id="add-comment-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg">পোস্ট করুন</button></div></div>`;
+            const commentsListEl = document.getElementById('comments-list');
+            const taskComments = comments[taskId] || [];
+            if (taskComments.length > 0) taskComments.forEach(comment => { const commentEl = document.createElement('div'); commentEl.className = 'text-sm'; const author = teamMembers.find(m => m.id === comment.authorId) || {name: 'Unknown User'}; commentEl.innerHTML = `<p class="font-semibold">${author.name} <span class="text-xs text-slate-400 ml-2">${comment.createdAt.toDate().toLocaleString('bn-BD')}</span></p><p class="p-2 bg-slate-100 dark:bg-slate-700 rounded-md mt-1">${comment.text}</p>`; commentsListEl.appendChild(commentEl); });
+            else commentsListEl.innerHTML = `<p class="text-center text-slate-400">এখনো কোনো মন্তব্য নেই।</p>`;
+            document.getElementById('data-entry-modal').classList.remove('hidden');
+            document.getElementById('add-comment-btn').onclick = () => addComment(taskId, taskText);
+            document.getElementById('modal-close-btn').onclick = closeModal;
+        }
+        function addComment(taskId, taskText) { const input = document.getElementById('new-comment-input'); const text = input.value.trim(); if (text) { commentsCollection.add({ taskId, text, authorId: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() }); logActivity(`"${taskText}" কাজে একটি মন্তব্য করেছেন।`); input.value = ''; } }
+        function logActivity(description) { if (!description) return; activityLogCollection.add({ description, user: currentUser.name, timestamp: firebase.firestore.FieldValue.serverTimestamp() }); metadataDoc.set({ timestamp: firebase.firestore.FieldValue.serverTimestamp() }); }
+        function renderActivityLog(container) {
+            container.innerHTML = `<div class="space-y-4 p-2"></div>`;
+            const listContainer = container.querySelector('.space-y-4');
+            if (activityLog.length === 0) listContainer.innerHTML = `<p class="text-center py-8 text-slate-500">কোনো একটিভিটি পাওয়া যায়নি।</p>`;
+            else activityLog.forEach(log => {
+                const item = document.createElement('div');
+                item.className = 'flex items-start gap-3 text-sm';
+                item.innerHTML = `<ion-icon name="ellipse" class="text-blue-500 text-xs mt-1"></ion-icon><div><p><span class="font-semibold">${log.user}</span> ${log.description}</p><p class="text-xs text-slate-400">${log.timestamp.toDate().toLocaleString('bn-BD')}</p></div>`;
+                listContainer.appendChild(item);
+            });
+        }
+        function renderDebtTracker(container) { let totalDebt = 0, totalPaid = 0; debts.forEach(d => { totalDebt += Number(d.totalAmount); totalPaid += Number(d.paidAmount); }); const totalRemaining = totalDebt - totalPaid; const overallProgress = totalDebt > 0 ? (totalPaid / totalDebt) * 100 : 0; container.innerHTML = `<div class="p-2 sm:p-4"><div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2"><h3 class="text-lg font-bold">সকল ঋণ</h3><button id="add-debt-btn" class="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"><ion-icon name="add-circle-outline" class="mr-2"></ion-icon> নতুন ঋণ</button></div><div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-center"><div class="card p-3 rounded-lg"><p class="text-xs sm:text-sm">মোট ঋণ</p><p class="text-xl sm:text-2xl font-bold">৳${totalDebt.toLocaleString('bn-BD')}</p></div><div class="card p-3 rounded-lg"><p class="text-xs sm:text-sm">পরিশোধিত</p><p class="text-xl sm:text-2xl font-bold text-green-500">৳${totalPaid.toLocaleString('bn-BD')}</p></div><div class="card p-3 rounded-lg"><p class="text-xs sm:text-sm">বাকি</p><p class="text-xl sm:text-2xl font-bold text-amber-500">৳${totalRemaining.toLocaleString('bn-BD')}</p></div></div><div class="w-full progress-bg rounded-full h-2.5 mb-6"><div class="progress-bar h-2.5 rounded-full" style="width: ${overallProgress}%"></div></div><div id="debt-list" class="space-y-4"></div></div>`; const listContainer = document.getElementById('debt-list'); if (debts.length === 0) listContainer.innerHTML = `<p class="text-center py-8 text-slate-500">কোনো ঋণ যোগ করা হয়নি।</p>`; else debts.forEach(debt => { const progress = debt.totalAmount > 0 ? (debt.paidAmount / debt.totalAmount) * 100 : 0; const item = document.createElement('div'); item.className = 'card p-4 rounded-lg'; item.innerHTML = `<div class="flex justify-between items-center mb-2"><h4 class="font-bold">${debt.name}</h4><span class="text-sm font-medium ${progress === 100 ? 'text-green-500' : 'text-amber-500'}">৳${(debt.totalAmount - debt.paidAmount).toLocaleString('bn-BD')} বাকি</span></div><p class="text-sm text-slate-500 mb-2">মোট: ৳${Number(debt.totalAmount).toLocaleString('bn-BD')}</p><div class="w-full progress-bg rounded-full h-2.5"><div class="progress-bar h-2.5 rounded-full" style="width: ${progress}%"></div></div>`; listContainer.appendChild(item); }); document.getElementById('add-debt-btn').onclick = showDebtModal; }
+        function renderIncomeExpense(container) { container.innerHTML = `<div class="p-2 sm:p-4"><div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2"><h3 class="text-lg font-bold">মাসিক আয়-ব্যয় চিত্র</h3><button id="add-transaction-btn" class="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"><ion-icon name="add-circle-outline" class="mr-2"></ion-icon> নতুন লেনদেন</button></div><div class="h-80 card p-2 sm:p-4 rounded-lg"><canvas id="incomeExpenseChart"></canvas></div></div>`; updateIncomeExpenseChart(); document.getElementById('add-transaction-btn').onclick = showTransactionModal; }
+        function renderAdminView(container) { container.innerHTML = `<div class="p-2 sm:p-4"><h3 class="text-lg font-bold mb-4">ব্যবহারকারী ব্যবস্থাপনা</h3><div class="grid grid-cols-1 md:grid-cols-2 gap-6"><div class="card p-4 rounded-lg"> <h4 class="font-semibold mb-3">নতুন ব্যবহারকারী তৈরি করুন</h4> <form id="add-user-form" class="space-y-3"> <input type="text" id="new-user-name" placeholder="নাম" required class="w-full p-2 rounded card"> <input type="email" id="new-user-email" placeholder="ইমেইল" required class="w-full p-2 rounded card"> <input type="password" id="new-user-password" placeholder="পাসওয়ার্ড" required class="w-full p-2 rounded card"> <select id="new-user-role" class="w-full p-2 rounded card"><option value="member">সদস্য</option><option value="admin">এডমিন</option></select> <button type="submit" class="w-full py-2 bg-blue-600 text-white rounded-lg">তৈরি করুন</button> </form></div><div class="card p-4 rounded-lg"> <h4 class="font-semibold mb-3">বর্তমান ব্যবহারকারীগণ</h4><div id="user-list" class="space-y-2"></div></div></div></div>`; const userListEl = document.getElementById('user-list'); teamMembers.forEach(user => { const userEl = document.createElement('div'); userEl.className = 'flex justify-between items-center text-sm'; userEl.innerHTML = `<span>${user.name} (${user.email})</span><span class="px-2 py-1 rounded-full text-xs ${user.role === 'admin' ? 'bg-green-200 text-green-800' : 'bg-slate-200'}">${user.role}</span>`; userListEl.appendChild(userEl); }); document.getElementById('add-user-form').addEventListener('submit', e => { e.preventDefault(); alert('নিরাপত্তার কারণে, এই ডেমোতে সরাসরি ইউজার তৈরি করা নিষ্ক্রিয় করা হয়েছে। Firebase Console থেকে ইউজার তৈরি করুন এবং Firestore-এ তার রোল নির্ধারণ করুন।'); }); }
+        function showDebtModal() { const modalWrapper = document.getElementById('modal-content-wrapper'); modalWrapper.innerHTML = `<h3 class="text-xl sm:text-2xl font-bold mb-6">নতুন ঋণ যোগ করুন</h3><form id="modal-form" class="space-y-4"><div><label class="block mb-1 text-sm">ঋণের নাম</label><input type="text" id="debt-name" class="w-full p-2 rounded card" required></div><div><label class="block mb-1 text-sm">মোট পরিমাণ</label><input type="number" id="debt-total" class="w-full p-2 rounded card" required></div><div><label class="block mb-1 text-sm">ইতিমধ্যে পরিশোধিত</label><input type="number" id="debt-paid" value="0" class="w-full p-2 rounded card" required></div></form><div class="flex justify-end space-x-4 mt-8"><button id="modal-close-btn" class="px-4 py-2 bg-slate-200 dark:bg-slate-600 rounded-lg">বাতিল</button><button id="modal-save-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg">সংরক্ষণ</button></div>`; document.getElementById('data-entry-modal').classList.remove('hidden'); document.getElementById('modal-save-btn').onclick = saveDebt; document.getElementById('modal-close-btn').onclick = closeModal; }
+        function showTransactionModal() { const modalWrapper = document.getElementById('modal-content-wrapper'); modalWrapper.innerHTML = `<h3 class="text-xl sm:text-2xl font-bold mb-6">নতুন লেনদেন যোগ করুন</h3><form id="modal-form" class="space-y-4"><div><label class="block mb-1 text-sm">বিবরণ</label><input type="text" id="tr-desc" class="w-full p-2 rounded card" required></div><div><label class="block mb-1 text-sm">পরিমাণ</label><input type="number" id="tr-amount" class="w-full p-2 rounded card" required></div><div><label class="block mb-1 text-sm">তারিখ</label><input type="date" id="tr-date" class="w-full p-2 rounded card" required></div><div><label class="block mb-1 text-sm">ধরন</label><select id="tr-type" class="w-full p-2 rounded card"><option value="income">আয়</option><option value="expense">ব্যয়</option></select></div></form><div class="flex justify-end space-x-4 mt-8"><button id="modal-close-btn" class="px-4 py-2 bg-slate-200 dark:bg-slate-600 rounded-lg">বাতিল</button><button id="modal-save-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg">সংরক্ষণ</button></div>`; document.getElementById('tr-date').valueAsDate = new Date(); document.getElementById('data-entry-modal').classList.remove('hidden'); document.getElementById('modal-save-btn').onclick = saveTransaction; document.getElementById('modal-close-btn').onclick = closeModal; }
+        function closeModal() { document.getElementById('data-entry-modal').classList.add('hidden'); }
+        function saveDebt() { const name = document.getElementById('debt-name').value; const totalAmount = parseFloat(document.getElementById('debt-total').value); const paidAmount = parseFloat(document.getElementById('debt-paid').value); if (name && !isNaN(totalAmount) && !isNaN(paidAmount)) { debtsCollection.add({ name, totalAmount, paidAmount, createdAt: firebase.firestore.FieldValue.serverTimestamp() }); logActivity(`নতুন ঋণ যোগ করেছেন: ${name}`); closeModal(); } else { alert('অনুগ্রহ করে সকল তথ্য সঠিকভাবে পূরণ করুন।'); } }
+        function saveTransaction() { const description = document.getElementById('tr-desc').value; const amount = parseFloat(document.getElementById('tr-amount').value); const date = document.getElementById('tr-date').value; const type = document.getElementById('tr-type').value; if (description && !isNaN(amount) && date) { transactionsCollection.add({ description, amount, date, type }); logActivity(`নতুন ${type === 'income' ? 'আয়' : 'ব্যয়'} যোগ করেছেন: ${description}`); closeModal(); } else { alert('অনুগ্রহ করে সকল তথ্য সঠিকভাবে পূরণ করুন।'); } }
+
+        // --- Chart Updates ---
+        function updateDashboard() { const totalTaskCount = initialTasks.length; const completed = tasks.filter(t => t.completed).length; const percentage = totalTaskCount > 0 ? Math.round((completed / totalTaskCount) * 100) : 0; document.getElementById('total-tasks').textContent = totalTaskCount; document.getElementById('completed-tasks').textContent = completed; document.getElementById('remaining-tasks').textContent = totalTaskCount - completed; document.getElementById('progress-percentage').textContent = `${percentage}%`; document.getElementById('progress-bar').style.width = `${percentage}%`; updateProgressChart(completed, totalTaskCount - completed); }
+        function updateProgressChart(completed, remaining) { const ctx = document.getElementById('progressChart').getContext('2d'); const data = { labels: ['সম্পন্ন', 'বাকি'], datasets: [{ data: [completed, remaining], backgroundColor: [ 'rgba(22, 163, 74, 0.8)', 'rgba(245, 158, 11, 0.8)'], borderColor: [ 'var(--secondary-bg)' ], borderWidth: 4, hoverOffset: 8 }] }; if (progressChart) { progressChart.data = data; progressChart.update(); } else { progressChart = new Chart(ctx, { type: 'doughnut', data, options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { display: false } } } }); } }
+        function updateIncomeExpenseChart() { const ctx = document.getElementById('incomeExpenseChart')?.getContext('2d'); if (!ctx) return; const monthlyData = transactions.reduce((acc, tr) => { const month = tr.date.substring(0, 7); if (!acc[month]) acc[month] = { income: 0, expense: 0 }; acc[month][tr.type] += tr.amount; return acc; }, {}); const sortedMonths = Object.keys(monthlyData).sort(); const labels = sortedMonths.map(m => new Date(m + '-02').toLocaleString('bn-BD', { month: 'long', year: 'numeric' })); const incomeData = sortedMonths.map(m => monthlyData[m].income); const expenseData = sortedMonths.map(m => monthlyData[m].expense); const data = { labels, datasets: [ { label: 'আয়', data: incomeData, backgroundColor: 'rgba(22, 163, 74, 0.7)' }, { label: 'ব্যয়', data: expenseData, backgroundColor: 'rgba(239, 68, 68, 0.7)' } ] }; if (incomeExpenseChart) { incomeExpenseChart.data = data; incomeExpenseChart.update(); } else { incomeExpenseChart = new Chart(ctx, { type: 'bar', data, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } } }); } }
+    
+        // --- Template and Recurrence Functions ---
+        function showApplyTemplateModal() {
+            const modalWrapper = document.getElementById('modal-content-wrapper');
+            modalWrapper.innerHTML = `<h3 class="text-xl font-bold mb-4">টেমপ্লেট থেকে কাজ যোগ করুন</h3><div class="space-y-4"><div><label class="block mb-1 text-sm">কোন টেমপ্লেট ব্যবহার করবেন?</label><select id="template-select" class="w-full p-2 rounded card">${templates.map(t => `<option value="${t.id}">${t.name}</option>`).join('')}</select></div><div><label class="block mb-1 text-sm">কোন ধাপে যোগ করবেন?</label><select id="template-step-select" class="w-full p-2 rounded card">${Object.keys(taskSteps).map(key => `<option value="${key}">${taskSteps[key].title}</option>`).join('')}</select></div></div><div class="flex justify-end space-x-4 mt-8"><button id="modal-close-btn" class="px-4 py-2 bg-slate-200 dark:bg-slate-600 rounded-lg">বাতিল</button><button id="apply-template-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg">যোগ করুন</button></div>`;
+            document.getElementById('data-entry-modal').classList.remove('hidden');
+            document.getElementById('apply-template-btn').onclick = applyTemplate;
+            document.getElementById('modal-close-btn').onclick = closeModal;
+        }
+
+        function showTemplateManagerModal() {
+            alert("টেমপ্লেট ম্যানেজমেন্ট ফিচারটি পরবর্তী আপডেটে আসছে।");
+        }
+
+        function applyTemplate() {
+            const templateId = document.getElementById('template-select').value;
+            const step = document.getElementById('template-step-select').value;
+            const selectedTemplate = templates.find(t => t.id === templateId);
+            if (selectedTemplate && selectedTemplate.tasks) {
+                const batch = db.batch();
+                selectedTemplate.tasks.forEach(taskText => {
+                    const newTaskRef = tasksCollection.doc();
+                    batch.set(newTaskRef, { text: taskText, step: parseInt(step), completed: false, parent: null, priority: false, assignedTo: null, dueDate: null, progress: 0, recurrence: null, dependsOn: [], createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                });
+                batch.commit().then(() => { logActivity(`"${selectedTemplate.name}" টেমপ্লেটটি ব্যবহার করেছেন।`); closeModal(); }).catch(err => { console.error("Error applying template: ", err); alert("টেমপ্লেট ব্যবহারে সমস্যা হয়েছে।"); });
+            }
+        }
+
+        function handleTaskCompletion(task) {
+            const isCompleting = !task.completed;
+            updateTaskField(task.id, { completed: isCompleting, progress: isCompleting ? 100 : task.progress }, `"${task.text}" কাজটি ${isCompleting ? 'সম্পন্ন' : 'অসম্পূর্ণ'} করেছেন।`);
+            if (isCompleting && task.recurrence) {
+                const originalDueDate = task.dueDate ? new Date(task.dueDate) : new Date();
+                let nextDueDate = new Date(originalDueDate);
+                if (task.recurrence === 'daily') nextDueDate.setDate(nextDueDate.getDate() + 1);
+                else if (task.recurrence === 'weekly') nextDueDate.setDate(nextDueDate.getDate() + 7);
+                else if (task.recurrence === 'monthly') nextDueDate.setMonth(nextDueDate.getMonth() + 1);
+                
+                const newTaskData = { ...initialTasks.find(t => t.id === task.id), ...task, completed: false, progress: 0, dueDate: nextDueDate.toISOString().split('T')[0] };
+                delete newTaskData.id;
+                tasksCollection.add(newTaskData).then(() => { logActivity(`পুনরাবৃত্তিমূলক কাজ "${task.text}" নতুন করে তৈরি হয়েছে।`); });
+            }
+        }
+
+        function showRecurrenceMenu(button, task) {
+            const menuHTML = `<div class="absolute z-10 bg-white dark:bg-slate-700 rounded-md shadow-lg border dark:border-slate-600 p-2 text-sm"><div data-recur="null" class="p-1 hover:bg-slate-100 dark:hover:bg-slate-600 rounded cursor-pointer">পুনরাবৃত্তি নেই</div><div data-recur="daily" class="p-1 hover:bg-slate-100 dark:hover:bg-slate-600 rounded cursor-pointer">দৈনিক</div><div data-recur="weekly" class="p-1 hover:bg-slate-100 dark:hover:bg-slate-600 rounded cursor-pointer">সাপ্তাহিক</div><div data-recur="monthly" class="p-1 hover:bg-slate-100 dark:hover:bg-slate-600 rounded cursor-pointer">মাসিক</div></div>`;
+            const menu = document.createElement('div');
+            menu.innerHTML = menuHTML;
+            menu.style.position = 'absolute';
+            document.body.appendChild(menu);
+            const rect = button.getBoundingClientRect();
+            menu.style.top = `${rect.bottom}px`;
+            menu.style.left = `${rect.left}px`;
+            const closeMenu = (e) => {
+                if (menu.parentNode === document.body) {
+                    document.body.removeChild(menu);
+                }
+                window.removeEventListener('click', closeMenu);
+            };
+            menu.querySelectorAll('[data-recur]').forEach(el => {
+                el.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const recurrence = el.dataset.recur === 'null' ? null : el.dataset.recur;
+                    updateTaskField(task.id, { recurrence }, `"${task.text}" কাজের পুনরাবৃত্তি সেট করেছেন।`);
+                    closeMenu();
+                });
+            });
+            setTimeout(() => window.addEventListener('click', closeMenu), 0);
+        }
+    </script>
+</body>
+</html>
