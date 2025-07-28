@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>আল-হিকমাহ উমরাহ্ প্যাকেজ - ইনফোগ্রাফিক</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Chosen Palette: Sacred Greens & Gold -->
+    <!-- Application Structure Plan: The SPA is structured as a narrative infographic. It begins with a strong hero section, followed by key performance indicators (KPIs) presented as visually appealing cards. A central data visualization (donut chart) breaks down the stay duration. The core of the application is an interactive vertical timeline that allows users to explore the day-by-day itinerary without being overwhelmed. This structure was chosen to transform a text-heavy report into an engaging, easily digestible visual story, enhancing user understanding and experience. -->
+    <!-- Visualization & Content Choices: Report Info: Stay Duration -> Goal: Compare -> Viz/Presentation Method: Donut Chart (Chart.js/Canvas) -> Interaction: Hover to see tooltips. Justification: A donut chart is excellent for showing simple proportions, making the Makkah vs. Madinah stay instantly clear. Report Info: Day-by-day plan -> Goal: Organize/Change -> Viz/Presentation Method: Interactive Vertical Timeline (HTML/CSS/JS) -> Interaction: Click-to-expand is not needed; a clear, scrollable timeline is more direct for this narrative. Icons provide quick visual context. Justification: A timeline is the most logical way to present a chronological itinerary. Report Info: Key Package Details -> Goal: Inform -> Viz/Presentation Method: Icon-driven cards. Justification: Cards break down key info into scannable, memorable chunks. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Hind Siliguri', sans-serif;
+            background-color: #F8F5F2;
+            color: #3D352A;
+        }
+        h1, h2, h3 {
+            font-family: 'Playfair Display', serif;
+        }
+        .hero-bg {
+            background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('https://raw.githubusercontent.com/NaeemNajm/pic/refs/heads/main/10.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fit;
+        }
+        .timeline-item .icon {
+            background-color: #4A634D;
+            color: white;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: absolute;
+            left: -25px;
+            top: 0;
+            border: 3px solid #F8F5F2;
+            z-index: 10;
+        }
+        .timeline-item .content {
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .timeline-item:hover .content {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .optional-tag {
+            background-color: #C8A97E;
+            color: white;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Header -->
+    <header class="bg-white/80 backdrop-blur-sm shadow-md sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-xl md:text-2xl font-bold text-[#4A634D]">AL-HIKMAH TOUR & TRAVELS</h1>
+            <p class="hidden sm:block text-md font-semibold text-gray-600">Trusted Partner for Travellers</p>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero-bg text-white py-24 md:py-32 text-center">
+        <div class="container mx-auto px-4">
+            <h2 class="text-4xl md:text-6xl font-extrabold mb-4">আপনার আধ্যাত্মিক অভিযাত্রা</h2>
+            <p class="text-xl md:text-2xl font-light">১৩ রাত / ১৪ দিনের একটি সম্ভাব্য * পূর্ণাঙ্গ ভ্রমণ পরিকল্পনা</p>
+        </div>
+    </section>
+
+    <main class="container mx-auto p-4 md:p-8">
+
+        <!-- Key Info Section -->
+        <section id="info" class="my-16">
+            <h3 class="text-3xl md:text-4xl font-bold text-center mb-10 text-[#4A634D]">একনজরে প্যাকেজ</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div class="bg-white p-6 rounded-lg shadow-lg text-center">
+                    <i class="fas fa-clock fa-3x text-[#C8A97E] mb-4"></i>
+                    <h4 class="text-xl font-semibold mb-2">প্যাকেজের মেয়াদ</h4>
+                    <p class="text-lg">১৩ রাত / ১৪ দিন</p>
+                    <p class="text-sm text-gray-500">(মক্কায় ৮ রাত, মদিনায় ৫ রাত)</p>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-lg text-center">
+                    <i class="fas fa-hotel fa-3x text-[#C8A97E] mb-4"></i>
+                    <h4 class="text-xl font-semibold mb-2">হোটেল</h4>
+                    <p class="text-sm"><strong>মক্কা:</strong> দার আল খলিল আল রুশাদ / লুলু আল দার</p>
+                    <p class="text-sm"><strong>মদিনা:</strong> তাজ ওয়ার্ড / দিয়ার আল নূর</p>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-lg text-center">
+                    <i class="fab fa-whatsapp fa-3x text-[#C8A97E] mb-4"></i>
+                    <h4 class="text-xl font-semibold mb-2">প্রি-ট্র্যাভেল ওরিয়েন্টেশন</h4>
+                    <p class="text-lg">২রা আগস্ট, ২০২৫ (শনিবার)</p>
+                    <p class="text-sm text-gray-500">হোয়াটসঅ্যাপে অনুষ্ঠিত হবে</p>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-lg text-center">
+                    <i class="fas fa-plane-departure fa-3x text-[#C8A97E] mb-4"></i>
+                    <h4 class="text-xl font-semibold mb-2">ফ্লাইট শিডিউল</h4>
+                    <p class="text-lg">শীঘ্রই নিশ্চিত করা হবে</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Visualization Section -->
+        <section id="visualization" class="my-16 bg-white p-8 rounded-lg shadow-xl">
+            <h3 class="text-3xl md:text-4xl font-bold text-center mb-8 text-[#4A634D]">ভ্রমণের সময় বিভাজন</h3>
+            <div class="chart-container relative h-80 md:h-96 w-full max-w-md mx-auto">
+                <canvas id="stay-duration-chart"></canvas>
+            </div>
+            <p class="text-center mt-4 text-gray-600">এই চার্টটি মক্কা ও মদিনায় আপনার রাত্রিযাপনের অনুপাত তুলে ধরেছে, যা মোট ১৩ রাতের মধ্যে বিভক্ত।</p>
+        </section>
+
+        <!-- Itinerary Timeline Section -->
+        <section id="itinerary" class="my-16">
+            <h3 class="text-3xl md:text-4xl font-bold text-center mb-12 text-[#4A634D]">পূর্ণাঙ্গ ভ্রমণ পরিকল্পনা</h3>
+            <div id="timeline-container" class="relative max-w-3xl mx-auto pl-8 border-l-4 border-[#4A634D]">
+                <!-- Timeline items will be injected here by JS -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-[#3D352A] text-white">
+        <div class="container mx-auto p-8 text-center">
+            <h3 class="text-2xl font-bold mb-4">আপনার প্রয়োজনে যোগাযোগ করুন</h3>
+            <p class="mb-4 font-semibold text-lg">AL-HIKMAH TOUR & TRAVELS</p>
+            <div class="md:flex justify-center md:space-x-12">
+                <div class="mb-4 md:mb-0">
+                    <h4 class="font-bold text-lg mb-2 border-b-2 border-[#C8A97E] inline-block">হেড অফিস</h4>
+                    <p><i class="fas fa-map-marker-alt mr-2"></i>৪-১, লেভেল-৩, কা-৫৪/৪, যমুনা ফিউচার পার্ক সংলগ্ন, বসুন্ধরা আবাসিক মেইন রোড, ঢাকা-১২২৯</p>
+                </div>
+                <div>
+                    <h4 class="font-bold text-lg mb-2 border-b-2 border-[#C8A97E] inline-block">ব্রাঞ্চ অফিস</h4>
+                    <p><i class="fas fa-map-marker-alt mr-2"></i>তেতুলিয়া রোড, জগদল, পঞ্চগড়-৫০০০</p>
+                </div>
+            </div>
+            <div class="mt-6 border-t border-gray-600 pt-6">
+                <p class="mb-2"><i class="fas fa-phone-alt mr-2"></i>01914-137050, 01840-137050, 01975-137050</p>
+                <p class="mb-2"><i class="fas fa-envelope mr-2"></i>alhikmahtourbd@gmail.com</p>
+                <p><i class="fas fa-globe mr-2"></i>www.alhikmahtour.com</p>
+            </div>
+            <p class="mt-8 text-sm italic"> এটি একটি ইনিশিয়াল প্লান, কিন্তু আল্লাহ উত্তম পরিকল্পনাকারী। আল্লাহ আপনার উমরাহ্ কবুল করুন। আমিন।</p>
+        </div>
+    </footer>
+
+    <script>
+        // Data for the application
+        const itineraryData = [
+            { phase: "প্রথম পর্ব: মক্কা শরীফ (৮ রাত / ৯ দিন)" },
+            { day: "দিন ১ ও ২ (৪-৫ আগস্ট)", title: "মক্কায় আগমন, উমরাহ ও বিশ্রাম", details: "পবিত্র মক্কা নগরীতে আপনাকে স্বাগত! এয়ারপোর্ট থেকে হোটেলে পৌঁছে বিশ্রাম নিন এবং সফরের ক্লান্তি দূর করুন। এরপর পবিত্র উমরাহ্ পালনের উদ্দেশ্যে প্রস্তুত হয়ে তাওয়াফ, সা'ঈ এবং হলক/কসর সম্পন্ন করুন। হারাম শরীফের রুহানী পরিবেশের সাথে একাত্ম হতে এই দিনগুলো ব্যক্তিগত ইবাদতে কাটান।", icon: "fa-plane-arrival" },
+            { day: "দিন ৩ (৬ আগস্ট)", title: "বিশেষ ইবাদত ও কা'বা চত্বরে বিচরণ", details: "আজ হারামে ৫ ওয়াক্ত নামাজ আদায় করুন। ব্যক্তিগতভাবে কমপক্ষে ২/৩ টি তাওয়াফ করার চেষ্টা করুন। ভিড় কম থাকলে হাজরে আসওয়াদে চুমু দেওয়া, কা'বার চৌকাঠ, মুলতাযাম ও গিলাফ স্পর্শ করার সুযোগ নিন। হাতিমে কা'বা খোলা থাকলে সেখানে ২ রাকাত নামাজ পড়তে ভুলবেন না।", icon: "fa-kaaba" },
+            { day: "দিন ৪ (৭ আগস্ট)", title: "মক্কা যিয়ারাহ (কোম্পানি কর্তৃক)", details: "আজ কোম্পানির পক্ষ থেকে সম্পূর্ণ বিনামূল্যে মক্কার ঐতিহাসিক স্থানসমূহ (জাবালে নূর, জাবালে সুর, আরাফাতের ময়দান, মিনা, মুযদালিফা ইত্যাদি) পরিদর্শনের ব্যবস্থা থাকবে।", icon: "fa-bus-alt" },
+            { day: "দিন ৫ (৮ আগস্ট)", title: "পবিত্র জুমু'আর দিন", details: "জুমার দিনের ফজিলত অপরিসীম। সকাল ৯:৩০ টার মধ্যে হারামে উপস্থিত হয়ে এই দিনের বরকত হাসিল করুন। আসর থেকে মাগরিব পর্যন্ত দোয়ার বিশেষ মুহূর্তে আল্লাহর দরবারে কান্নাকাটি করুন। এদিনও কমপক্ষে ২-৩টি তাওয়াফ করার চেষ্টা করুন।", icon: "fa-mosque" },
+            { day: "দিন ৬ (৯ আগস্ট)", title: "তায়েফ যিয়ারাহ (ঐচ্ছিক)", details: "ব্যক্তিগত খরচে ঐতিহাসিক তায়েফ নগরী ভ্রমণের সুযোগ। চাইলে মনোরম পার্বত্য স্থান 'আল-শাফা'ও ভ্রমণ তালিকায় যুক্ত করতে পারেন। <strong>আনুমানিক খরচ:</strong> বড় গ্রুপ হলে জনপ্রতি ৪০-৪৫ রিয়াল।", icon: "fa-mountain-city", optional: true },
+            { day: "দিন ৭ (১০ আগস্ট)", title: "জেদ্দা সিটি ট্যুর (ঐচ্ছিক)", details: "লোহিত সাগরের পাড়ে অবস্থিত জেদ্দা শহর ভ্রমণের সুযোগ। <strong>পরিদর্শনীয় স্থান:</strong> লোহিত সাগর, মা হাওয়া (আঃ) এর কবরস্থান, মসজিদে কিসাস। <strong>আনুমানিক খরচ:</strong> বড় গ্রুপ হলে জনপ্রতি ৩০ রিয়াল।", icon: "fa-water", optional: true },
+            { day: "দিন ৮ (১১ আগস্ট)", title: "মক্কায় শেষ প্রস্তুতি", details: "ইচ্ছা হলে নিজ খরচে জি'রানা মিকাত থেকে আরেকটি উমরাহ্ পালন করতে পারেন। মদিনা যাত্রার জন্য ব্যাগ গুছিয়ে নিন এবং শেষ মুহূর্তগুলো ইবাদতে কাটান।", icon: "fa-suitcase-rolling" },
+            { day: "দিন ৯ (১২ আগস্ট)", title: "মদিনার পথে যাত্রা", details: "আজ মক্কায় আমাদের শেষ দিন। বিদায়ী তাওয়াফ সম্পন্ন করে দুপুরের পূর্বে হোটেল থেকে চেক-আউট করে নবীজির শহর মদিনার উদ্দেশ্যে যাত্রা শুরু করুন।", icon: "fa-route" },
+            { phase: "দ্বিতীয় পর্ব: মদিনা মুনাওয়ারা (৫ রাত / ৬ দিন)" },
+            { day: "দিন ৯ (১২ আগস্ট)", title: "মদিনায় আগমন", details: "সন্ধ্যায় মদিনায় পৌঁছে হোটেলে বিশ্রাম নিন। এরপর মসজিদে নববীতে উপস্থিত হয়ে হৃদয়ের সমস্ত ভালোবাসা দিয়ে নবীজি (ﷺ) এর রওজা শরীফে সালাম পেশ করুন।", icon: "fa-moon" },
+            { day: "দিন ১০ (১৩ আগস্ট)", title: "মসজিদে নববীতে ইবাদত", details: "সারাদিন মসজিদে নববীর শান্তিময় পরিবেশে ইবাদত, কোরআন তিলাওয়াত ও দরুদ পাঠে অতিবাহিত করুন। সুযোগমতো 'রিয়াজুল জান্নাতে' (জান্নাতের বাগান) দুই রাকাত নফল নামাজ আদায়ের চেষ্টা করুন।", icon: "fa-book-quran" },
+            { day: "দিন ১১ (১৪ আগস্ট)", title: "মদিনা যিয়ারাহ", details: "আজ মদিনার ঐতিহাসিক স্থানসমূহ, যেমন: ইসলামের প্রথম মসজিদ ‘মসজিদে কুবা’, দুই কিবলার মসজিদ ‘মসজিদে কিবলাতাইন’, উহুদ যুদ্ধের ময়দান ও শহীদদের কবরস্থান এবং খন্দকের যুদ্ধের ঐতিহাসিক স্থানসমূহ যিয়ারত করানো হবে।", icon: "fa-bus-alt" },
+            { day: "দিন ১২ (১৫ আগস্ট)", title: "মদিনায় জুমু'আ", details: "নবীজির মসজিদে জুমু'আর নামাজ আদায় করা এক অসাধারণ সৌভাগ্যের বিষয়। সকাল সকাল মসজিদে উপস্থিত হয়ে এই সুযোগ গ্রহণ করুন এবং বাকি দিনটুকু ব্যক্তিগত ইবাদত ও জিকিরে কাটান।", icon: "fa-mosque" },
+            { day: "দিন ১৩ (১৬ আগস্ট)", title: "বিশেষ ঐচ্ছিক সফর ও বিদায়ী প্রস্তুতি", details: "আজ ব্যক্তিগত খরচে <strong>বদরের প্রান্তর, বীরে শেফা অথবা জাবালে জ্বীন (জ্বীন পাহাড়)</strong> পরিদর্শনের সুযোগ থাকছে। সফর শেষে কেনাকাটা ও দেশে ফেরার প্রস্তুতি সম্পন্ন করুন।", icon: "fa-hiking", optional: true },
+            { day: "দিন ১৪ (১৭ আগস্ট)", title: "স্বদেশ প্রত্যাবর্তন", details: "আজ সফরের শেষ দিন। ফজরের নামাজ আদায় করে হোটেলের নিয়ম অনুযায়ী চেক-আউট করে ঢাকার উদ্দেশ্যে মদিনা এয়ারপোর্টের পথে যাত্রা করুন।", icon: "fa-plane-departure" },
+        ];
+
+        // Function to render timeline
+        const timelineContainer = document.getElementById('timeline-container');
+        itineraryData.forEach(item => {
+            if (item.phase) {
+                const phaseElement = document.createElement('div');
+                phaseElement.className = 'mb-8 mt-12';
+                phaseElement.innerHTML = `<h4 class="text-2xl font-bold text-white bg-[#4A634D] p-3 rounded-md shadow-lg inline-block">${item.phase}</h4>`;
+                timelineContainer.appendChild(phaseElement);
+            } else {
+                const itemElement = document.createElement('div');
+                itemElement.className = 'timeline-item mb-8 relative';
+                
+                let optionalTag = item.optional ? `<span class="optional-tag text-xs font-semibold mr-2 px-2.5 py-0.5 rounded-full">ঐচ্ছিক</span>` : '';
+
+                itemElement.innerHTML = `
+                    <div class="icon text-xl">
+                        <i class="fas ${item.icon}"></i>
+                    </div>
+                    <div class="content ml-10 p-6 bg-white rounded-lg shadow-md">
+                        <div class="flex justify-between items-center mb-2">
+                            <h5 class="text-xl font-bold text-[#4A634D]">${item.day}</h5>
+                            ${optionalTag}
+                        </div>
+                        <h6 class="text-lg font-semibold mb-2">${item.title}</h6>
+                        <p class="text-gray-600">${item.details.replace(/<[^>]*>/g, '')}</p>
+                    </div>
+                `;
+                timelineContainer.appendChild(itemElement);
+            }
+        });
+
+        // Chart.js Donut Chart
+        const ctx = document.getElementById('stay-duration-chart').getContext('2d');
+        const stayDurationChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: [
+                    ['মক্কায়', 'রাত্রিযাপন'], 
+                    ['মদিনায়', 'রাত্রিযাপন']
+                ],
+                datasets: [{
+                    label: 'রাত্রিযাপন',
+                    data: [8, 5],
+                    backgroundColor: [
+                        '#4A634D', // Makkah
+                        '#C8A97E', // Madinah
+                    ],
+                    borderColor: [
+                        '#FFFFFF',
+                        '#FFFFFF'
+                    ],
+                    borderWidth: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            font: {
+                                family: "'Hind Siliguri', sans-serif",
+                                size: 14
+                            },
+                            padding: 20,
+                            // This function joins the array label for display
+                            generateLabels: function(chart) {
+                                const data = chart.data;
+                                if (data.labels.length && data.datasets.length) {
+                                    return data.labels.map(function(label, i) {
+                                        const meta = chart.getDatasetMeta(0);
+                                        const style = meta.controller.getStyle(i);
+                                        return {
+                                            text: Array.isArray(label) ? label.join(' ') : label,
+                                            fillStyle: style.backgroundColor,
+                                            strokeStyle: style.borderColor,
+                                            lineWidth: style.borderWidth,
+                                            hidden: isNaN(data.datasets[0].data[i]) || meta.data[i].hidden,
+                                            index: i
+                                        };
+                                    });
+                                }
+                                return [];
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: function(tooltipItems) {
+                                const item = tooltipItems[0];
+                                let label = item.chart.data.labels[item.dataIndex];
+                                return Array.isArray(label) ? label.join(' ') : label;
+                            },
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed !== null) {
+                                    label += context.parsed + ' রাত';
+                                }
+                                return label;
+                            }
+                        },
+                        titleFont: {
+                            family: "'Hind Siliguri', sans-serif",
+                        },
+                        bodyFont: {
+                            family: "'Hind Siliguri', sans-serif",
+                        }
+                    }
+                },
+                cutout: '60%'
+            }
+        });
+    </script>
+</body>
+</html>
