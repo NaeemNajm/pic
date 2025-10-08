@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>দৈনিক হাজিরা ও বেতন হিসাব</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tiro+Bangla:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Tiro Bangla', sans-serif;
+            background-color: #f1f5f9; /* slate-100 */
+        }
+        .calendar-grid {
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+        }
+        .day-header {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: 600;
+            color: #475569; /* slate-600 */
+        }
+        .day-cell {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            aspect-ratio: 1 / 1;
+            padding: 4px;
+            gap: 2px;
+            transition: all 0.15s ease-in-out;
+            cursor: pointer;
+            border-radius: 50%;
+            background: #f1f5f9; /* slate-100 */
+            box-shadow: 5px 5px 10px #d1d5db, -5px -5px 10px #ffffff;
+        }
+        .day-cell:active {
+            box-shadow: inset 5px 5px 10px #d1d5db, inset -5px -5px 10px #ffffff;
+            transform: scale(0.97);
+        }
+        .day-cell.other-month {
+            background-color: #e2e8f0; /* slate-200 */
+            box-shadow: inset 2px 2px 4px #d1d5db, inset -2px -2px 4px #ffffff;
+            cursor: not-allowed;
+        }
+         .day-cell.other-month .day-number {
+            opacity: 0.5;
+        }
+        .day-cell.friday {
+            background-color: #fee2e2;
+            color: #b91c1c;
+            font-weight: 700;
+            box-shadow: none;
+            cursor: not-allowed;
+            font-size: 1.25rem;
+        }
+        .day-cell.today {
+            background-color: #e0e7ff; /* indigo-100 */
+            outline: 3px solid #6366f1;
+            outline-offset: -2px;
+        }
+        .day-number {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #334155; /* slate-700 */
+            line-height: 1;
+        }
+        .attendance-summary {
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: #166534; /* green-800 */
+            background-color: #dcfce7; /* green-100 */
+            padding: 1px 6px;
+            border-radius: 9999px;
+            line-height: 1.2;
+        }
+        
+        #attendance-modal, #employee-management-view, #date-picker-modal { display: none; }
+        #attendance-modal.flex, #employee-management-view.flex, #date-picker-modal.flex { display: flex; }
+
+        .offscreen-container {
+            position: absolute;
+            left: -9999px;
+        }
+        .employee-card {
+            background: linear-gradient(145deg, #ffffff, #e6e9ee);
+            transition: all 0.3s ease;
+        }
+        .employee-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .management-view-scrollbar::-webkit-scrollbar { width: 8px; }
+        .management-view-scrollbar::-webkit-scrollbar-track { background: #e0e7ff; }
+        .management-view-scrollbar::-webkit-scrollbar-thumb { background-color: #818cf8; border-radius: 10px; border: 2px solid #e0e7ff; }
+    </style>
+</head>
+<body class="p-2 sm:p-4 md:p-6">
+
+    <div id="capture-area" class="max-w-7xl mx-auto bg-slate-50 rounded-2xl shadow-2xl overflow-hidden ring-1 ring-slate-200">
+         <header class="bg-indigo-600 text-white p-4 text-center">
+            <h1 class="text-2xl font-bold">আল-হিকমাহ ট্যুর এন্ড ট্রাভেলস</h1>
+            <p class="text-sm opacity-90">দৈনিক হাজিরা ও মাসিক বেতন হিসাব</p>
+        </header>
+        <div class="md:flex">
+            <!-- Calendar Section -->
+            <div class="w-full md:w-2/3 p-4 sm:p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <button id="prev-month" class="px-3 py-2 bg-slate-200 text-slate-700 hover:bg-slate-300 rounded-lg transition-colors">&lt; পূর্ববর্তী</button>
+                    <h2 id="month-year" class="text-lg sm:text-2xl font-bold text-slate-800 text-center cursor-pointer hover:text-indigo-600 transition-colors" title="মাস পরিবর্তন করুন"></h2>
+                    <button id="next-month" class="px-3 py-2 bg-slate-200 text-slate-700 hover:bg-slate-300 rounded-lg transition-colors">পরবর্তী &gt;</button>
+                </div>
+
+                <div class="grid calendar-grid gap-2 text-xs sm:text-sm mb-2">
+                    <div class="day-header text-red-600">শুক্র</div>
+                    <div class="day-header">শনি</div>
+                    <div class="day-header">রবি</div>
+                    <div class="day-header">সোম</div>
+                    <div class="day-header">মঙ্গল</div>
+                    <div class="day-header">বুধ</div>
+                    <div class="day-header">বৃহঃ</div>
+                </div>
+                <div id="calendar-body" class="grid calendar-grid gap-2 sm:gap-3">
+                    <!-- Calendar days generated here -->
+                </div>
+            </div>
+
+            <!-- Summary & Download Section -->
+            <div class="w-full md:w-1/3 bg-indigo-50 p-6 border-t md:border-t-0 md:border-l border-slate-200 flex flex-col justify-between">
+                <div>
+                    <h3 class="text-2xl font-bold text-indigo-800 mb-4">কর্মচারী সারাংশ</h3>
+                    <div class="bg-white p-4 rounded-lg shadow space-y-2 mb-4">
+                        <div class="flex justify-between items-center text-sm">
+                            <span>মোট কর্মচারী:</span>
+                            <span id="total-employees" class="font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">০</span>
+                        </div>
+                        <div class="flex justify-between items-center text-sm">
+                            <span>মোট মাসিক বেতন:</span>
+                            <span id="total-base-salary" class="font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">৳ ০</span>
+                        </div>
+                    </div>
+                     <button id="open-employee-manager-btn" class="w-full bg-indigo-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-600 transition-all text-lg">
+                        কর্মচারী ম্যানেজ করুন
+                    </button>
+                </div>
+                
+                <div class="mt-6 pt-6 border-t-2 border-indigo-200">
+                    <h3 class="text-lg font-bold text-slate-700 mb-3 text-center">ডাউনলোড সেন্টার</h3>
+                     <div class="bg-white p-4 rounded-lg shadow mb-4 ring-1 ring-indigo-200">
+                        <div class="flex justify-between items-center text-sm mb-1">
+                            <span>মোট শুক্রবার:</span>
+                            <span id="friday-count" class="font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">০</span>
+                        </div>
+                        <div class="flex justify-between items-center text-sm">
+                            <span>মোট প্রদেয় বেতন:</span>
+                            <span id="total-payable" class="font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">৳ ০</span>
+                        </div>
+                    </div>
+                     <div class="space-y-3">
+                        <div>
+                            <label for="employee-select-for-download" class="text-sm font-medium text-slate-600 mb-1 block">কর্মচারীর বেতন কার্ড</label>
+                            <div class="flex items-center gap-2">
+                                 <select id="employee-select-for-download" class="w-full p-2 border border-slate-300 rounded-lg bg-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                                     <option value="">-- কর্মচারী নির্বাচন --</option>
+                                 </select>
+                                 <button id="download-selected-card-btn" class="flex-shrink-0 bg-teal-500 text-white font-bold py-2 px-3 rounded-lg hover:bg-teal-600 transition-all text-sm disabled:bg-slate-300" disabled>ডাউনলোড</button>
+                            </div>
+                        </div>
+                        <button id="download-detailed-report-btn" class="w-full bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-800 transition-all">
+                           বিস্তারিত মাসিক রিপোর্ট (PDF)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attendance Modal -->
+    <div id="attendance-modal" class="fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md m-4">
+            <div class="p-4 border-b">
+                <h3 class="text-lg font-bold text-slate-800" id="modal-title">হাজিরা নিন</h3>
+            </div>
+            <div id="modal-employee-list" class="p-4 max-h-64 overflow-y-auto space-y-2"></div>
+            <div class="p-4 bg-slate-50 border-t flex justify-end gap-2">
+                <button id="modal-close-btn" class="px-4 py-2 bg-slate-200 text-slate-700 rounded-md hover:bg-slate-300">বাতিল</button>
+                <button id="modal-save-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">সেভ করুন</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Month/Year Picker Modal -->
+    <div id="date-picker-modal" class="fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm m-4">
+            <div class="p-4 border-b"><h3 class="text-lg font-bold text-slate-800">মাস ও বছর নির্বাচন করুন</h3></div>
+            <div class="p-4 space-y-4">
+                <div>
+                    <label for="month-select" class="block text-sm font-medium text-slate-700">মাস</label>
+                    <select id="month-select" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"></select>
+                </div>
+                <div>
+                    <label for="year-input" class="block text-sm font-medium text-slate-700">বছর</label>
+                    <input type="number" id="year-input" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                </div>
+            </div>
+            <div class="p-4 bg-slate-50 border-t flex justify-end gap-2">
+                <button id="date-picker-cancel-btn" class="px-4 py-2 bg-slate-200 text-slate-700 rounded-md hover:bg-slate-300">বাতিল</button>
+                <button id="date-picker-set-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">সেট করুন</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Employee Management View -->
+    <div id="employee-management-view" class="fixed inset-0 bg-slate-100 z-50 flex-col">
+        <header class="flex-shrink-0 bg-white shadow-md p-4 flex justify-between items-center">
+            <h2 class="text-2xl font-bold text-indigo-800">কর্মচারী ম্যানেজমেন্ট</h2>
+            <div>
+                 <button id="export-json-btn" class="bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition-transform hover:scale-105">Export JSON</button>
+                <button id="import-json-btn" class="ml-2 bg-blue-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-600 transition-transform hover:scale-105">Import JSON</button>
+                <button id="add-employee-btn" class="ml-4 bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-600 transition-transform hover:scale-105">+ নতুন কর্মচারী</button>
+                <button id="close-management-view-btn" class="ml-4 bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">বন্ধ করুন</button>
+            </div>
+        </header>
+        <main id="employee-management-container" class="flex-grow p-6 overflow-y-auto management-view-scrollbar grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></main>
+    </div>
+
+    <div id="report-card-container" class="offscreen-container"></div>
+
+
+    <script>
+        const DOM = {
+            monthYear: document.getElementById('month-year'),
+            calendarBody: document.getElementById('calendar-body'),
+            prevMonth: document.getElementById('prev-month'),
+            nextMonth: document.getElementById('next-month'),
+            fridayCount: document.getElementById('friday-count'),
+            totalPayable: document.getElementById('total-payable'),
+            totalEmployees: document.getElementById('total-employees'),
+            totalBaseSalary: document.getElementById('total-base-salary'),
+            openEmployeeManagerBtn: document.getElementById('open-employee-manager-btn'),
+            
+            // Management View
+            employeeManagementView: document.getElementById('employee-management-view'),
+            closeManagementViewBtn: document.getElementById('close-management-view-btn'),
+            addEmployee: document.getElementById('add-employee-btn'),
+            employeeManagementContainer: document.getElementById('employee-management-container'),
+            exportJsonBtn: document.getElementById('export-json-btn'),
+            importJsonBtn: document.getElementById('import-json-btn'),
+
+            // Download Section
+            employeeSelectForDownload: document.getElementById('employee-select-for-download'),
+            downloadSelectedCardBtn: document.getElementById('download-selected-card-btn'),
+            downloadDetailedReport: document.getElementById('download-detailed-report-btn'),
+            
+            // Attendance Modal
+            modal: document.getElementById('attendance-modal'),
+            modalTitle: document.getElementById('modal-title'),
+            modalEmployeeList: document.getElementById('modal-employee-list'),
+            modalCloseBtn: document.getElementById('modal-close-btn'),
+            modalSaveBtn: document.getElementById('modal-save-btn'),
+
+            // Date Picker Modal
+            datePickerModal: document.getElementById('date-picker-modal'),
+            monthSelect: document.getElementById('month-select'),
+            yearInput: document.getElementById('year-input'),
+            datePickerCancelBtn: document.getElementById('date-picker-cancel-btn'),
+            datePickerSetBtn: document.getElementById('date-picker-set-btn'),
+            
+            reportCardContainer: document.getElementById('report-card-container'),
+        };
+
+        const monthNames = ["জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর"];
+        const numBengali = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+        const toBengali = n => String(n).split('').map(digit => numBengali[digit] || digit).join('');
+
+        let currentDate = new Date();
+        let employees = [];
+        
+        function saveState() { localStorage.setItem('attendanceAppData', JSON.stringify({ employees })); }
+        function loadState() {
+            const data = JSON.parse(localStorage.getItem('attendanceAppData'));
+            if (data && data.employees) {
+                 employees = data.employees.map(emp => ({
+                    ...emp,
+                    designation: emp.designation || 'ইও',
+                    deductions: emp.deductions || [],
+                    advances: emp.advances || [],
+                }));
+            }
+        }
+
+        function renderCalendar() {
+            DOM.calendarBody.innerHTML = '';
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            DOM.monthYear.textContent = `${monthNames[month]} ${toBengali(year)}`;
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const firstDayOfMonth = new Date(year, month, 1).getDay();
+            const adjustedFirstDay = (firstDayOfMonth + 2) % 7;
+
+            let fridaysInMonth = 0;
+            for (let day = 1; day <= daysInMonth; day++) if (new Date(year, month, day).getDay() === 5) fridaysInMonth++;
+            DOM.fridayCount.textContent = toBengali(fridaysInMonth);
+
+            for (let i = 0; i < adjustedFirstDay; i++) DOM.calendarBody.insertAdjacentHTML('beforeend', '<div class="day-cell other-month"></div>');
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayCell = document.createElement('div');
+                dayCell.className = 'day-cell';
+                const dayDate = new Date(year, month, day);
+                const dayOfWeek = dayDate.getDay();
+                const dateString = `${year}-${month}-${day}`;
+
+                if (dayOfWeek === 5) {
+                    dayCell.classList.add('friday');
+                    dayCell.innerHTML = toBengali(day);
+                } else {
+                    let presentCount = 0;
+                    employees.forEach(emp => { if (emp.attendance[dateString]) presentCount++; });
+                    dayCell.innerHTML = `
+                        ${presentCount > 0 ? `<div class="attendance-summary">${toBengali(presentCount)}</div>` : ''}
+                        <span class="day-number">${toBengali(day)}</span>
+                    `;
+                    dayCell.onclick = () => openAttendanceModal(dateString);
+                }
+                
+                const today = new Date();
+                if (day === today.getDate() && month === today.getMonth() && year === today.getFullYear()) dayCell.classList.add('today');
+                DOM.calendarBody.appendChild(dayCell);
+            }
+            updateAllCalculations();
+        }
+        
+        function createEmployeeCard(employee) {
+            const deductionsHTML = (employee.deductions || []).map(d => `
+                <div class="flex items-center gap-2 mt-2" data-deduction-id="${d.id}">
+                    <input type="text" value="${d.reason}" oninput="updateDeduction(${employee.id}, ${d.id}, 'reason', this.value)" placeholder="কারণ" class="flex-grow p-1 border rounded text-xs">
+                    <input type="number" value="${d.amount}" oninput="updateDeduction(${employee.id}, ${d.id}, 'amount', this.value)" placeholder="টাকা" class="w-20 p-1 border rounded text-right text-xs">
+                    <button onclick="removeDeduction(${employee.id}, ${d.id})" class="text-red-500 font-bold">&times;</button>
+                </div>`).join('');
+            
+            const advancesHTML = (employee.advances || []).map(a => `
+                <div class="flex items-center gap-2 mt-2" data-advance-id="${a.id}">
+                    <input type="text" value="${a.reason}" oninput="updateAdvance(${employee.id}, ${a.id}, 'reason', this.value)" placeholder="কারণ" class="flex-grow p-1 border rounded text-xs">
+                    <input type="number" value="${a.amount}" oninput="updateAdvance(${employee.id}, ${a.id}, 'amount', this.value)" placeholder="টাকা" class="w-20 p-1 border rounded text-right text-xs">
+                    <button onclick="removeAdvance(${employee.id}, ${a.id})" class="text-red-500 font-bold">&times;</button>
+                </div>`).join('');
+            
+            const designationOptions = ['সিইও', 'এইচইও', 'ইও', 'এএ']
+                .map(d => `<option value="${d}" ${employee.designation === d ? 'selected' : ''}>${d}</option>`).join('');
+
+            return `
+            <div class="employee-card p-4 rounded-xl shadow-lg ring-1 ring-slate-200" data-id="${employee.id}">
+                <div class="flex justify-between items-center mb-3">
+                    <input type="text" value="${employee.name}" oninput="updateEmployee(${employee.id}, 'name', this.value)" placeholder="কর্মচারীর নাম" class="w-full p-1 bg-transparent border-b-2 font-bold text-lg text-slate-800 focus:border-indigo-500 outline-none transition">
+                    <button onclick="removeEmployee(${employee.id})" class="ml-2 text-red-400 hover:text-red-600 font-bold text-2xl transition-transform hover:rotate-90">&times;</button>
+                </div>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between items-center bg-slate-100 p-2 rounded-md">
+                        <label class="font-semibold text-slate-600">পদ:</label>
+                        <select onchange="updateEmployee(${employee.id}, 'designation', this.value)" class="w-1/2 p-1 border rounded text-right bg-white">${designationOptions}</select>
+                    </div>
+                    <div class="flex justify-between items-center bg-slate-100 p-2 rounded-md">
+                        <label class="font-semibold text-slate-600">মাসিক বেতন:</label>
+                        <input type="number" value="${employee.salary}" oninput="updateEmployee(${employee.id}, 'salary', this.value)" placeholder="বেতন" class="w-1/2 p-1 border rounded text-right bg-white">
+                    </div>
+                    <div class="flex justify-between items-center bg-slate-100 p-2 rounded-md">
+                        <label class="font-semibold text-slate-600">হাজিরা (দিন):</label>
+                        <div class="present-days-display font-bold text-green-700 bg-green-100 px-3 py-1 rounded-full">০</div>
+                    </div>
+                    <div class="bg-red-50 p-2 rounded-md">
+                        <div class="flex justify-between items-center">
+                             <label class="font-semibold text-slate-600">মোট কর্তন:</label>
+                             <div class="total-deductions-display font-bold text-red-700 bg-red-100 px-3 py-1 rounded-full">৳ ০</div>
+                        </div>
+                        <div class="deductions-list">${deductionsHTML}</div>
+                        <button onclick="addDeduction(${employee.id})" class="w-full mt-2 text-xs bg-slate-200 text-slate-700 font-semibold py-1 rounded-md hover:bg-slate-300 transition">+ কর্তন যোগ করুন</button>
+                    </div>
+                    <div class="bg-yellow-50 p-2 rounded-md">
+                        <div class="flex justify-between items-center">
+                             <label class="font-semibold text-slate-600">মোট অগ্রিম:</label>
+                             <div class="total-advances-display font-bold text-yellow-700 bg-yellow-100 px-3 py-1 rounded-full">৳ ০</div>
+                        </div>
+                        <div class="advances-list">${advancesHTML}</div>
+                        <button onclick="addAdvance(${employee.id})" class="w-full mt-2 text-xs bg-slate-200 text-slate-700 font-semibold py-1 rounded-md hover:bg-slate-300 transition">+ অগ্রিম যোগ করুন</button>
+                    </div>
+                    <div class="bg-indigo-600 text-white p-3 rounded-lg flex justify-between items-center mt-2 shadow-inner">
+                        <span class="font-bold">নীট প্রদেয় বেতন:</span>
+                        <span class="payable-salary text-lg font-bold">৳ ০</span>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function populateEmployeeDropdown() {
+            const select = DOM.employeeSelectForDownload;
+            select.innerHTML = '<option value="">-- কর্মচারী নির্বাচন --</option>';
+            employees.forEach(emp => {
+                const option = document.createElement('option');
+                option.value = emp.id;
+                option.textContent = emp.name || 'নামবিহীন';
+                select.appendChild(option);
+            });
+            DOM.downloadSelectedCardBtn.disabled = true;
+        }
+
+        function renderEmployeesForManagement() {
+            DOM.employeeManagementContainer.innerHTML = employees.map(createEmployeeCard).join('') || `<p class="text-slate-500 text-center col-span-full">কোনো কর্মচারী যোগ করা হয়নি।</p>`;
+            updateAllCalculations();
+        }
+
+        function updateSummary() {
+            DOM.totalEmployees.textContent = toBengali(employees.length);
+            const totalBase = employees.reduce((sum, emp) => sum + (parseFloat(emp.salary) || 0), 0);
+            DOM.totalBaseSalary.textContent = `৳ ${toBengali(Math.round(totalBase))}`;
+        }
+
+        function updateAllCalculations() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            let fridaysInMonth = 0;
+            for (let day = 1; day <= daysInMonth; day++) if (new Date(year, month, day).getDay() === 5) fridaysInMonth++;
+            
+            let totalNetPayableSalary = 0;
+            employees.forEach(emp => {
+                const presentDays = Object.keys(emp.attendance).filter(dateKey => {
+                    const [dYear, dMonth] = dateKey.split('-').map(Number);
+                    return emp.attendance[dateKey] && dYear === year && dMonth === month;
+                }).length;
+
+                const totalDeductions = (emp.deductions || []).reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
+                const totalAdvances = (emp.advances || []).reduce((sum, a) => sum + (parseFloat(a.amount) || 0), 0);
+                
+                const card = DOM.employeeManagementContainer.querySelector(`[data-id='${emp.id}']`);
+                const totalAttendance = presentDays + fridaysInMonth;
+                const monthlySalary = parseFloat(emp.salary) || 0;
+                const grossPayableSalary = (monthlySalary / daysInMonth) * totalAttendance || 0;
+                const netPayableSalary = grossPayableSalary - totalDeductions - totalAdvances;
+                
+                if (card) {
+                    card.querySelector('.present-days-display').textContent = toBengali(presentDays);
+                    card.querySelector('.total-deductions-display').textContent = `৳ ${toBengali(Math.round(totalDeductions))}`;
+                    card.querySelector('.total-advances-display').textContent = `৳ ${toBengali(Math.round(totalAdvances))}`;
+                    card.querySelector('.payable-salary').textContent = `৳ ${toBengali(Math.round(netPayableSalary))}`;
+                }
+                totalNetPayableSalary += netPayableSalary;
+            });
+            DOM.totalPayable.textContent = `৳ ${toBengali(Math.round(totalNetPayableSalary))}`;
+            updateSummary();
+        }
+        
+        function openAttendanceModal(dateString) {
+            const [year, month, day] = dateString.split('-');
+            DOM.modalTitle.textContent = `${toBengali(day)} ${monthNames[month]}, ${toBengali(year)} তারিখের হাজিরা`;
+            DOM.modalEmployeeList.innerHTML = '';
+            employees.forEach(emp => {
+                const isPresent = emp.attendance[dateString] || false;
+                DOM.modalEmployeeList.innerHTML += `
+                    <label class="flex items-center p-2 rounded-md hover:bg-slate-100 cursor-pointer">
+                        <input type="checkbox" data-employee-id="${emp.id}" ${isPresent ? 'checked' : ''} class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 accent-indigo-500">
+                        <span class="ml-3 text-slate-700">${emp.name || 'নামবিহীন'}</span>
+                    </label>`;
+            });
+            DOM.modal.classList.add('flex');
+            DOM.modalSaveBtn.onclick = () => saveAttendance(dateString);
+        }
+
+        function saveAttendance(dateString) {
+            const checkboxes = DOM.modalEmployeeList.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => {
+                const empId = cb.dataset.employeeId;
+                employees.find(e => e.id == empId).attendance[dateString] = cb.checked;
+            });
+            DOM.modal.classList.remove('flex');
+            renderCalendar();
+            saveState();
+        }
+
+        window.addEmployee = function() {
+            const newEmployee = { id: Date.now(), name: '', designation: 'ইও', salary: '', attendance: {}, deductions: [], advances: [] };
+            employees.push(newEmployee);
+            renderEmployeesForManagement();
+            populateEmployeeDropdown();
+            saveState();
+            DOM.employeeManagementContainer.querySelector(`[data-id='${newEmployee.id}'] input[type='text']`).focus();
+        }
+        
+        window.removeEmployee = function(id) {
+            employees = employees.filter(emp => emp.id !== id);
+            renderEmployeesForManagement();
+            populateEmployeeDropdown();
+            saveState();
+        }
+
+        window.updateEmployee = function(id, field, value) {
+            const employee = employees.find(emp => emp.id === id);
+            if (employee) {
+                employee[field] = value;
+                if (field === 'name') populateEmployeeDropdown();
+                updateAllCalculations();
+                saveState();
+            }
+        }
+        
+        // Deduction Functions
+        window.addDeduction = function(employeeId) {
+            const employee = employees.find(emp => emp.id === employeeId);
+            if(employee) {
+                employee.deductions.push({ id: Date.now(), reason: '', amount: '' });
+                renderEmployeesForManagement();
+                saveState();
+            }
+        }
+        window.removeDeduction = function(employeeId, deductionId) {
+            const employee = employees.find(emp => emp.id === employeeId);
+            if (employee) {
+                employee.deductions = employee.deductions.filter(d => d.id !== deductionId);
+                renderEmployeesForManagement();
+                saveState();
+            }
+        }
+        window.updateDeduction = function(employeeId, deductionId, field, value) {
+            const employee = employees.find(emp => emp.id === employeeId);
+            const deduction = employee?.deductions?.find(d => d.id === deductionId);
+            if (deduction) {
+                deduction[field] = value;
+                updateAllCalculations();
+                saveState();
+            }
+        }
+
+        // Advance Functions
+        window.addAdvance = function(employeeId) {
+            const employee = employees.find(emp => emp.id === employeeId);
+            if (employee) {
+                employee.advances.push({ id: Date.now(), reason: '', amount: '' });
+                renderEmployeesForManagement();
+                saveState();
+            }
+        }
+        window.removeAdvance = function(employeeId, advanceId) {
+            const employee = employees.find(emp => emp.id === employeeId);
+            if (employee) {
+                employee.advances = employee.advances.filter(a => a.id !== advanceId);
+                renderEmployeesForManagement();
+                saveState();
+            }
+        }
+        window.updateAdvance = function(employeeId, advanceId, field, value) {
+            const employee = employees.find(emp => emp.id === employeeId);
+            const advance = employee?.advances?.find(a => a.id === advanceId);
+            if (advance) {
+                advance[field] = value;
+                updateAllCalculations();
+                saveState();
+            }
+        }
+
+        // Report Functions
+        window.downloadIndividualReport = function(employeeId) {
+            const emp = employees.find(e => e.id === employeeId);
+            if (!emp) return;
+
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            let fridaysInMonth = 0;
+            for (let day = 1; day <= daysInMonth; day++) if (new Date(year, month, day).getDay() === 5) fridaysInMonth++;
+            
+            const presentDays = Object.keys(emp.attendance).filter(dateKey => {
+                const [dYear, dMonth] = dateKey.split('-').map(Number);
+                return emp.attendance[dateKey] && dYear === year && dMonth === month;
+            }).length;
+
+            const totalAttendance = presentDays + fridaysInMonth;
+            const monthlySalary = parseFloat(emp.salary) || 0;
+            const grossPayableSalary = (monthlySalary / daysInMonth) * totalAttendance;
+            const totalDeductions = (emp.deductions || []).reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
+            const totalAdvances = (emp.advances || []).reduce((sum, a) => sum + (parseFloat(a.amount) || 0), 0);
+            const netPayableSalary = grossPayableSalary - totalDeductions - totalAdvances;
+
+            const deductionsRows = (emp.deductions || []).map(d => `<tr><td class="p-2 border">${d.reason}</td><td class="p-2 border text-right">৳ ${toBengali(Math.round(d.amount))}</td></tr>`).join('');
+            const advancesRows = (emp.advances || []).map(a => `<tr><td class="p-2 border">${a.reason}</td><td class="p-2 border text-right">৳ ${toBengali(Math.round(a.amount))}</td></tr>`).join('');
+
+            const reportHTML = `
+                <div class="p-8 bg-white" style="width: 500px; border: 1px solid #ddd;">
+                    <div class="text-center mb-6">
+                        <h1 class="text-2xl font-bold text-indigo-700">আল-হিকমাহ ট্যুর এন্ড ট্রাভেলস</h1>
+                        <p class="text-sm text-slate-500">৪-১, লেভেল -৩, ক-১৪/৪, মাদ্রাসা বিল্ডিং, যমুনা ফিউচার পার্ক সংলগ্ন, বসুন্ধরা আবাসিক রোড, ঢাকা-১২২৯</p>
+                        <h2 class="text-xl font-semibold mt-4 text-slate-800 border-b-2 pb-2">মাসিক বেতন বিবরণী</h2>
+                    </div>
+                    <div class="mb-6 text-sm">
+                        <p class="flex justify-between"><strong>কর্মচারীর নাম:</strong> <span>${emp.name}</span></p>
+                        <p class="flex justify-between"><strong>পদ:</strong> <span>${emp.designation || 'N/A'}</span></p>
+                        <p class="flex justify-between"><strong>মাস:</strong> <span>${monthNames[month]}, ${toBengali(year)}</span></p>
+                        <p class="flex justify-between"><strong>মাসিক বেতন:</strong> <span>৳ ${toBengali(monthlySalary)}</span></p>
+                    </div>
+                    <table class="w-full text-left border-collapse mb-4 text-sm">
+                        <thead><tr class="bg-slate-100"><th class="p-2 border">বেতনের বিবরণ</th><th class="p-2 border text-right">দিন/টাকা</th></tr></thead>
+                        <tbody>
+                            <tr><td class="p-2 border">মোট বেতনযোগ্য দিন</td><td class="p-2 border text-right">${toBengali(totalAttendance)} দিন</td></tr>
+                             <tr class="font-bold"><td class="p-2 border">মোট প্রদেয় বেতন</td><td class="p-2 border text-right">৳ ${toBengali(Math.round(grossPayableSalary))}</td></tr>
+                        </tbody>
+                    </table>
+                    ${(emp.deductions?.length > 0) ? `
+                    <table class="w-full text-left border-collapse mb-4 text-sm">
+                        <thead><tr class="bg-red-100"><th class="p-2 border">কর্তনের বিবরণ</th><th class="p-2 border text-right">টাকা</th></tr></thead>
+                        <tbody>${deductionsRows}<tr class="font-bold"><td class="p-2 border">মোট কর্তন</td><td class="p-2 border text-right">৳ ${toBengali(Math.round(totalDeductions))}</td></tr></tbody>
+                    </table>` : ''}
+                    ${(emp.advances?.length > 0) ? `
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead><tr class="bg-yellow-100"><th class="p-2 border">অগ্রিম বিবরণ</th><th class="p-2 border text-right">টাকা</th></tr></thead>
+                        <tbody>${advancesRows}<tr class="font-bold"><td class="p-2 border">মোট অগ্রিম</td><td class="p-2 border text-right">৳ ${toBengali(Math.round(totalAdvances))}</td></tr></tbody>
+                    </table>` : ''}
+                    <div class="mt-6 bg-indigo-50 p-4 rounded-lg">
+                        <p class="flex justify-between font-bold text-lg"><span>নীট প্রদেয় বেতন:</span> <span>৳ ${toBengali(Math.round(netPayableSalary))}</span></p>
+                    </div>
+                </div>
+            `;
+            
+            DOM.reportCardContainer.innerHTML = reportHTML;
+            const fileName = `রিপোর্ট-${emp.name}-${monthNames[month]}.png`;
+            setTimeout(() => {
+                html2canvas(DOM.reportCardContainer.firstElementChild, { scale: 2, useCORS: true }).then(canvas => {
+                    const link = document.createElement('a');
+                    link.download = fileName;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                    DOM.reportCardContainer.innerHTML = '';
+                }).catch(err => console.error("Report download failed:", err));
+            }, 100);
+        }
+
+        function generateDetailedReportHTML() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            let totalNetPayable = 0;
+            
+            const employeeRows = employees.map(emp => {
+                let fridaysInMonth = 0;
+                for (let day = 1; day <= daysInMonth; day++) if (new Date(year, month, day).getDay() === 5) fridaysInMonth++;
+                const presentDays = Object.keys(emp.attendance).filter(dateKey => {
+                    const [dYear, dMonth] = dateKey.split('-').map(Number);
+                    return emp.attendance[dateKey] && dYear === year && dMonth === month;
+                }).length;
+
+                const totalAttendance = presentDays + fridaysInMonth;
+                const monthlySalary = parseFloat(emp.salary) || 0;
+                const grossPayableSalary = (monthlySalary / daysInMonth) * totalAttendance || 0;
+                const totalDeductions = (emp.deductions || []).reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
+                const totalAdvances = (emp.advances || []).reduce((sum, a) => sum + (parseFloat(a.amount) || 0), 0);
+                const netPayableSalary = grossPayableSalary - totalDeductions - totalAdvances;
+                totalNetPayable += netPayableSalary;
+
+                return `
+                    <tr>
+                        <td class="border p-2">${emp.name || 'N/A'}</td>
+                        <td class="border p-2 text-center">${emp.designation || 'N/A'}</td>
+                        <td class="border p-2 text-right">৳ ${toBengali(monthlySalary)}</td>
+                        <td class="border p-2 text-center">${toBengali(totalAttendance)}</td>
+                        <td class="border p-2 text-right">৳ ${toBengali(Math.round(totalDeductions))}</td>
+                        <td class="border p-2 text-right">৳ ${toBengali(Math.round(totalAdvances))}</td>
+                        <td class="border p-2 text-right font-bold">৳ ${toBengali(Math.round(netPayableSalary))}</td>
+                    </tr>`;
+            }).join('');
+
+            return `
+                <!DOCTYPE html><html lang="bn"><head><meta charset="UTF-8"><title>মাসিক বিস্তারিত রিপোর্ট</title>
+                <script src="https://cdn.tailwindcss.com"><\/script>
+                <link href="https://fonts.googleapis.com/css2?family=Tiro+Bangla:wght@400;700&display=swap" rel="stylesheet">
+                <style>body{font-family:'Tiro Bangla',sans-serif;} @media print{@page{size:A4;margin:0.7in;}body{-webkit-print-color-adjust:exact;}.no-print{display:none;}}</style>
+                </head><body class="bg-white"><div class="max-w-4xl mx-auto p-8"><div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-indigo-700">আল-হিকমাহ ট্যুর এন্ড ট্রাভেলস</h1>
+                <p class="text-md text-slate-600">৪-১, লেভেল -৩, ক-১৪/৪, মাদ্রাসা বিল্ডিং, যমুনা ফিউচার পার্ক সংলগ্ন, বসুন্ধরা আবাসিক রোড, ঢাকা-১২২৯</p>
+                <h2 class="text-2xl font-semibold mt-6 text-slate-800 border-b-2 pb-2">মাসিক বেতন ও হাজিরা বিবরণী</h2>
+                <h3 class="text-xl font-medium mt-2">${monthNames[month]}, ${toBengali(year)}</h3></div>
+                <table class="w-full text-left border-collapse text-sm"><thead><tr class="bg-slate-200">
+                <th class="border p-2">কর্মচারীর নাম</th><th class="border p-2 text-center">পদ</th>
+                <th class="border p-2 text-right">মাসিক বেতন</th><th class="border p-2 text-center">মোট দিন</th>
+                <th class="border p-2 text-right">মোট কর্তন</th><th class="border p-2 text-right">মোট অগ্রিম</th>
+                <th class="border p-2 text-right">নীট প্রদেয় বেতন</th></tr></thead>
+                <tbody>${employeeRows}</tbody><tfoot><tr class="bg-slate-200 font-bold">
+                <td colspan="6" class="border p-2 text-right">সর্বমোট নীট প্রদেয় বেতন:</td>
+                <td class="border p-2 text-right">৳ ${toBengali(Math.round(totalNetPayable))}</td></tr></tfoot></table>
+                <div class="flex justify-between mt-24">
+                <div class="w-1/4 text-center"><hr class="border-black"/><p class="mt-2">প্রস্তুতকারক</p></div>
+                <div class="w-1/4 text-center"><hr class="border-black"/><p class="mt-2">হিসাবরক্ষক</p></div>
+                <div class="w-1/4 text-center"><hr class="border-black"/><p class="mt-2">ব্যবস্থাপক</p></div></div>
+                <div class="mt-8 text-center no-print"><button onclick="window.print()" class="bg-indigo-600 text-white px-6 py-2 rounded">প্রিন্ট করুন বা PDF সেভ করুন</button></div>
+                </div></body></html>`;
+        }
+        
+        function downloadDetailedReport() {
+            const reportContent = generateDetailedReportHTML();
+            const reportWindow = window.open('', '_blank');
+            reportWindow.document.write(reportContent);
+            reportWindow.document.close();
+            setTimeout(() => reportWindow.print(), 500);
+        }
+        
+        // Data Import/Export
+        function exportData() {
+            const dataStr = JSON.stringify(employees, null, 2);
+            const dataBlob = new Blob([dataStr], {type: "application/json"});
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.download = `employees-backup-${new Date().toISOString().slice(0,10)}.json`;
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importData() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json,application/json';
+            input.onchange = e => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = readerEvent => {
+                    try {
+                        const importedEmployees = JSON.parse(readerEvent.target.result);
+                        if (Array.isArray(importedEmployees)) {
+                            employees = importedEmployees;
+                            saveState();
+                            renderEmployeesForManagement();
+                            renderCalendar();
+                            populateEmployeeDropdown();
+                            alert('কর্মচারীর তথ্য সফলভাবে ইম্পোর্ট করা হয়েছে।');
+                        } else {
+                            throw new Error('Invalid file format');
+                        }
+                    } catch (err) {
+                        alert('ত্রুটি: ফাইলটি সঠিকভাবে পড়া সম্ভব হয়নি।');
+                        console.error(err);
+                    }
+                }
+                reader.readAsText(file);
+            }
+            input.click();
+        }
+
+        function init() {
+            loadState();
+            if (employees.length === 0) window.addEmployee();
+            
+            // Event Listeners
+            DOM.prevMonth.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() - 1); renderCalendar(); });
+            DOM.nextMonth.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() + 1); renderCalendar(); });
+            DOM.addEmployee.addEventListener('click', addEmployee);
+            DOM.downloadDetailedReport.addEventListener('click', downloadDetailedReport);
+            DOM.modalCloseBtn.addEventListener('click', () => DOM.modal.classList.remove('flex'));
+
+            // Employee Management View
+            DOM.openEmployeeManagerBtn.addEventListener('click', () => {
+                renderEmployeesForManagement();
+                DOM.employeeManagementView.classList.add('flex');
+            });
+            DOM.closeManagementViewBtn.addEventListener('click', () => {
+                DOM.employeeManagementView.classList.remove('flex');
+                renderCalendar();
+                populateEmployeeDropdown();
+            });
+            DOM.exportJsonBtn.addEventListener('click', exportData);
+            DOM.importJsonBtn.addEventListener('click', importData);
+
+            // Date Picker Modal
+            DOM.monthYear.addEventListener('click', () => {
+                DOM.monthSelect.innerHTML = monthNames.map((name, index) => `<option value="${index}">${name}</option>`).join('');
+                DOM.monthSelect.value = currentDate.getMonth();
+                DOM.yearInput.value = currentDate.getFullYear();
+                DOM.datePickerModal.classList.add('flex');
+            });
+            DOM.datePickerCancelBtn.addEventListener('click', () => DOM.datePickerModal.classList.remove('flex'));
+            DOM.datePickerSetBtn.addEventListener('click', () => {
+                currentDate = new Date(DOM.yearInput.value, DOM.monthSelect.value, 1);
+                DOM.datePickerModal.classList.remove('flex');
+                renderCalendar();
+            });
+
+            // Download Section
+            DOM.employeeSelectForDownload.addEventListener('change', () => {
+                DOM.downloadSelectedCardBtn.disabled = !DOM.employeeSelectForDownload.value;
+            });
+            DOM.downloadSelectedCardBtn.addEventListener('click', () => {
+                const selectedId = DOM.employeeSelectForDownload.value;
+                if (selectedId) downloadIndividualReport(parseInt(selectedId, 10));
+            });
+
+            renderCalendar();
+            populateEmployeeDropdown();
+            updateSummary();
+        }
+
+        init();
+    </script>
+</body>
+</html>
+
